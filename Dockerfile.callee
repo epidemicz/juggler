@@ -17,6 +17,6 @@ RUN         go get github.com/garyburd/redigo/redis \
                 && go get github.com/pborman/uuid \
                 && go build ./cmd/juggler-callee/
 
-ENTRYPOINT  ["./docker/docker_start.1.sh"]
-CMD         ["./juggler-callee", "--redis", "redis:6379"]
+ENTRYPOINT  ["./juggler-callee"]
+CMD         ["--redis", "redis:6379"]
 

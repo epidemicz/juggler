@@ -10,11 +10,15 @@ services:
             dockerfile: Dockerfile.server
         ports:
             - 9000:9000
+        command: ["./juggler-server", "--config", "./docker/server.config.1.yml"]
+        entrypoint: ./docker/docker_start.1.sh
 
     callee:
         build:
             context: ..
             dockerfile: Dockerfile.callee
+        command: ["./juggler-callee", "--redis", "redis:6379", "--workers", "10"]
+        entrypoint: ./docker/docker_start.1.sh
 
     client:
         build:
