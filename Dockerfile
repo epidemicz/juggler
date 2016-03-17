@@ -1,0 +1,20 @@
+FROM        golang:1.6-alpine
+
+ENV         DIR /go/src/github.com/PuerkitoBio/juggler
+
+# Install netcat to detect when redis becomes available
+RUN         set -x \
+                && apk add --no-cache --virtual netcat-openbsd
+
+# Copy the app in its correct path in the container.
+RUN         mkdir -p $DIR
+WORKDIR     $DIR
+COPY        . $DIR
+
+# Build the server
+RUN         go build ./cmd/juggler-server/
+
+EXPOSE      9000
+ENTRYPOINT  ["./docker/docker_start.1.sh"]
+CMD         ["./juggler-server", "--redis", "redis:6379", "--config", "./docker/server.config.1.yml"]
+
