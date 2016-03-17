@@ -11,7 +11,7 @@ services:
     server:
         build:
             context: ..
-            dockerfile: docker/Dockerfile.server
+            dockerfile: Dockerfile.server
         command: ["./juggler-server", "--config", "./docker/server.config.2.yml"]
         entrypoint: ./docker/docker_start.2.sh
         ports:
@@ -20,12 +20,12 @@ services:
     callee:
         build:
             context: ..
-            dockerfile: docker/Dockerfile.callee
+            dockerfile: Dockerfile.callee
         command: ["./juggler-callee", "--redis", "redisc:6379", "--workers", "10"]
         entrypoint: ./docker/docker_start.2.sh
 
     client:
         build:
             context: ..
-            dockerfile: docker/Dockerfile.client
+            dockerfile: Dockerfile.client
 
