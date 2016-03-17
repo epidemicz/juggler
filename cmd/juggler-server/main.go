@@ -22,10 +22,10 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/PuerkitoBio/exp/juggler"
-	"github.com/PuerkitoBio/exp/juggler/broker"
-	"github.com/PuerkitoBio/exp/juggler/broker/redisbroker"
-	"github.com/PuerkitoBio/exp/juggler/msg"
+	"github.com/PuerkitoBio/juggler"
+	"github.com/PuerkitoBio/juggler/broker"
+	"github.com/PuerkitoBio/juggler/broker/redisbroker"
+	"github.com/PuerkitoBio/juggler/msg"
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/websocket"
 )

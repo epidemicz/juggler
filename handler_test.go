@@ -6,8 +6,8 @@ import (
 	"testing"
 	"testing/quick"
 
-	"github.com/PuerkitoBio/exp/juggler/internal/jugglertest"
-	"github.com/PuerkitoBio/exp/juggler/msg"
+	"github.com/PuerkitoBio/juggler/internal/jugglertest"
+	"github.com/PuerkitoBio/juggler/msg"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

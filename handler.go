@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/PuerkitoBio/exp/juggler/msg"
+	"github.com/PuerkitoBio/juggler/msg"
 )
 
 // Handler defines the method required for a server to handle a send or receive

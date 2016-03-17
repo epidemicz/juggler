@@ -21,8 +21,8 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/PuerkitoBio/exp/juggler/broker"
-	"github.com/PuerkitoBio/exp/juggler/msg"
+	"github.com/PuerkitoBio/juggler/broker"
+	"github.com/PuerkitoBio/juggler/msg"
 	"github.com/gorilla/websocket"
 	"github.com/pborman/uuid"
 )

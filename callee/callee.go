@@ -10,8 +10,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/PuerkitoBio/exp/juggler/broker"
-	"github.com/PuerkitoBio/exp/juggler/msg"
+	"github.com/PuerkitoBio/juggler/broker"
+	"github.com/PuerkitoBio/juggler/msg"
 )
 
 // ErrCallExpired is returned when a call is processed but the

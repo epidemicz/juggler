@@ -15,10 +15,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/PuerkitoBio/exp/juggler/broker"
-	"github.com/PuerkitoBio/exp/juggler/broker/redisbroker"
-	"github.com/PuerkitoBio/exp/juggler/callee"
-	"github.com/PuerkitoBio/exp/juggler/msg"
+	"github.com/PuerkitoBio/juggler/broker"
+	"github.com/PuerkitoBio/juggler/broker/redisbroker"
+	"github.com/PuerkitoBio/juggler/callee"
+	"github.com/PuerkitoBio/juggler/msg"
 	"github.com/garyburd/redigo/redis"
 )
 

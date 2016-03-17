@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/PuerkitoBio/exp/juggler/broker"
+	"github.com/PuerkitoBio/juggler/broker"
 	"github.com/gorilla/websocket"
 )
 

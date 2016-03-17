@@ -11,9 +11,9 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/PuerkitoBio/exp/juggler/internal/jugglertest"
-	"github.com/PuerkitoBio/exp/juggler/internal/wstest"
-	"github.com/PuerkitoBio/exp/juggler/msg"
+	"github.com/PuerkitoBio/juggler/internal/jugglertest"
+	"github.com/PuerkitoBio/juggler/internal/wstest"
+	"github.com/PuerkitoBio/juggler/msg"
 	"github.com/gorilla/websocket"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/assert"

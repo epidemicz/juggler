@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/PuerkitoBio/exp/juggler/internal/redistest"
-	"github.com/PuerkitoBio/exp/juggler/msg"
+	"github.com/PuerkitoBio/juggler/internal/redistest"
+	"github.com/PuerkitoBio/juggler/msg"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

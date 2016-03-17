@@ -12,8 +12,8 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/PuerkitoBio/exp/juggler/client"
-	"github.com/PuerkitoBio/exp/juggler/msg"
+	"github.com/PuerkitoBio/juggler/client"
+	"github.com/PuerkitoBio/juggler/msg"
 	"github.com/gorilla/websocket"
 )
 

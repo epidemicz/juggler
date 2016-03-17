@@ -20,8 +20,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/PuerkitoBio/exp/juggler/broker"
-	"github.com/PuerkitoBio/exp/juggler/msg"
+	"github.com/PuerkitoBio/juggler/broker"
+	"github.com/PuerkitoBio/juggler/msg"
 	"github.com/garyburd/redigo/redis"
 	"github.com/pborman/uuid"
 )

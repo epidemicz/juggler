@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/PuerkitoBio/exp/juggler/internal/jugglertest"
-	"github.com/PuerkitoBio/exp/juggler/internal/wstest"
+	"github.com/PuerkitoBio/juggler/internal/jugglertest"
+	"github.com/PuerkitoBio/juggler/internal/wstest"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

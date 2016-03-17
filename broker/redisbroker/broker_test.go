@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/PuerkitoBio/exp/juggler/broker"
-	"github.com/PuerkitoBio/exp/juggler/internal/redistest"
-	"github.com/PuerkitoBio/exp/juggler/msg"
+	"github.com/PuerkitoBio/juggler/broker"
+	"github.com/PuerkitoBio/juggler/internal/redistest"
+	"github.com/PuerkitoBio/juggler/msg"
 	"github.com/garyburd/redigo/redis"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/assert"
