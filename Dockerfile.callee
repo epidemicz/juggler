@@ -4,6 +4,7 @@ ENV         DIR /go/src/github.com/PuerkitoBio/juggler
 
 # Install netcat to detect when redis becomes available
 RUN         set -x \
+                && apk add --no-cache --virtual git \
                 && apk add --no-cache --virtual netcat-openbsd
 
 # Copy the app in its correct path in the container.
@@ -12,7 +13,9 @@ WORKDIR     $DIR
 COPY        . $DIR
 
 # Build the callee
-RUN         go build ./cmd/juggler-callee/
+RUN         go get github.com/garyburd/redigo/redis \
+                && go get github.com/pborman/uuid \
+                && go build ./cmd/juggler-callee/
 
 ENTRYPOINT  ["./docker/docker_start.1.sh"]
 CMD         ["./juggler-callee", "--redis", "redis:6379"]
