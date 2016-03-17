@@ -1,7 +1,6 @@
 FROM        golang:1.6-alpine
 
-# TODO : update once moved to final repository
-ENV         DIR /go/src/github.com/PuerkitoBio/exp/juggler
+ENV         DIR /go/src/github.com/PuerkitoBio/juggler
 
 # Install netcat to detect when redis becomes available
 RUN         set -x \

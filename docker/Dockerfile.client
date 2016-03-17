@@ -1,7 +1,6 @@
 FROM        golang:1.6-alpine
 
-# TODO : update once moved to final repository
-ENV         DIR /go/src/github.com/PuerkitoBio/exp/juggler
+ENV         DIR /go/src/github.com/PuerkitoBio/juggler
 
 # Copy the app in its correct path in the container.
 RUN         mkdir -p $DIR
