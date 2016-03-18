@@ -58,6 +58,7 @@ func main() {
 	vars := expvar.NewMap("callee")
 
 	// start a web server to serve pprof and expvar data
+	log.Printf("serving debug endpoints on %s", *httpServerAddrFlag)
 	go func() {
 		log.Println(http.ListenAndServe(*httpServerAddrFlag, nil))
 	}()
