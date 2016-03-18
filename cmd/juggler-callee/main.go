@@ -32,7 +32,7 @@ var (
 	brokerResultCapFlag       = flag.Int("broker-result-cap", 100, "Capacity of the `results` queue.")
 	brokerBlockingTimeoutFlag = flag.Duration("broker-blocking-timeout", 0, "Blocking `timeout` when polling for call requests.")
 	workersFlag               = flag.Int("workers", 1, "Number of concurrent `workers` processing call requests.")
-	httpServerAddrFlag        = flag.String("addr", ":9001", "HTTP server `address` to serve debug endpoints.")
+	httpServerPortFlag        = flag.Int("port", 9001, "HTTP server `port` to serve debug endpoints.")
 	helpFlag                  = flag.Bool("help", false, "Show help.")
 )
 
@@ -58,9 +58,9 @@ func main() {
 	vars := expvar.NewMap("callee")
 
 	// start a web server to serve pprof and expvar data
-	log.Printf("serving debug endpoints on %s", *httpServerAddrFlag)
+	log.Printf("serving debug endpoints on %d", *httpServerPortFlag)
 	go func() {
-		log.Println(http.ListenAndServe(*httpServerAddrFlag, nil))
+		log.Println(http.ListenAndServe(":"+strconv.Itoa(*httpServerPortFlag), nil))
 	}()
 
 	log.Printf("listening for call requests on %s with %d workers", *redisAddrFlag, *workersFlag)

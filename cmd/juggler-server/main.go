@@ -31,11 +31,12 @@ import (
 )
 
 var (
-	redisAddrFlag       = flag.String("redis", ":6379", "Redis `address`.")
 	allowEmptyProtoFlag = flag.Bool("allow-empty-subprotocol", false, "Allow empty subprotocol during handshake.")
-	portFlag            = flag.Int("port", 9000, "Server `port`.")
 	configFlag          = flag.String("config", "", "Path of the configuration `file`.")
 	helpFlag            = flag.Bool("help", false, "Show help.")
+	noLogFlag           = flag.Bool("L", false, "Disable logging.")
+	portFlag            = flag.Int("port", 9000, "Server `port`.")
+	redisAddrFlag       = flag.String("redis", ":6379", "Redis `address`.")
 )
 
 // Redis defines the redis-specific configuration options.
@@ -261,11 +262,12 @@ func newHandler(conf *Server) juggler.Handler {
 		juggler.ProcessMsg(ctx, c, m)
 	})
 
+	chain := []juggler.Handler{process}
+	if !*noLogFlag {
+		chain = append([]juggler.Handler{juggler.HandlerFunc(juggler.LogMsg)}, chain...)
+	}
 	return juggler.PanicRecover(
-		juggler.Chain(
-			juggler.HandlerFunc(juggler.LogMsg),
-			process,
-		))
+		juggler.Chain(chain...))
 }
 
 func newPubSubBroker(pool *redis.Pool) broker.PubSubBroker {
@@ -325,13 +327,17 @@ func newServer(conf *Server, pubSub broker.PubSubBroker, caller broker.CallerBro
 		juggler.Subprotocols = append(juggler.Subprotocols, "")
 	}
 
+	cs := juggler.LogConn
+	if *noLogFlag {
+		cs = nil
+	}
 	return &juggler.Server{
 		ReadLimit:               conf.ReadLimit,
 		ReadTimeout:             conf.ReadTimeout,
 		WriteLimit:              conf.WriteLimit,
 		WriteTimeout:            conf.WriteTimeout,
 		AcquireWriteLockTimeout: conf.AcquireWriteLockTimeout,
-		ConnState:               juggler.LogConn,
+		ConnState:               cs,
 		PubSubBroker:            pubSub,
 		CallerBroker:            caller,
 	}
