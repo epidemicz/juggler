@@ -29,6 +29,7 @@ var (
 	addrFlag        = flag.String("addr", "ws://localhost:9000/ws", "Server `address`.")
 	connFlag        = flag.Int("c", 100, "Number of `connections`.")
 	durationFlag    = flag.Duration("d", 10*time.Second, "Run `duration`.")
+	delayFlag       = flag.Duration("delay", 0, "Start execution after `delay`.")
 	helpFlag        = flag.Bool("help", false, "Show help.")
 	payloadFlag     = flag.String("p", "100", "Call `payload`.")
 	subprotoFlag    = flag.String("proto", "juggler.0", "Websocket `subprotocol`.")
@@ -223,6 +224,8 @@ func main() {
 	if *connFlag <= 0 {
 		log.Fatalf("invalid -c value, must be greater than 0")
 	}
+
+	<-time.After(*delayFlag)
 
 	stats := &runStats{
 		Addr:     *addrFlag,
