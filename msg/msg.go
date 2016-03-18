@@ -122,6 +122,12 @@ func (mt MessageType) IsWrite() bool {
 	return startWrite < mt && mt < endWrite
 }
 
+// IsStd returns true if the message is a standard juggler message
+// (not a custom or unknown one).
+func (mt MessageType) IsStd() bool {
+	return mt.IsRead() || mt.IsWrite()
+}
+
 // Msg defines the common methods implemented by all messages.
 type Msg interface {
 	// Type returns the message type.

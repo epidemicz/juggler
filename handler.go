@@ -3,6 +3,7 @@ package juggler
 import (
 	"encoding/json"
 	"errors"
+	"expvar"
 	"fmt"
 	"io"
 	"runtime"
@@ -12,6 +13,11 @@ import (
 
 	"github.com/PuerkitoBio/juggler/msg"
 )
+
+// SlowProcessMsgThreshold defines the threshold at which calls to
+// ProcessMsg are marked as slow in the expvar metrics, if Server.Vars
+// is set. Set to 0 to disable SlowProcessMsg metrics.
+var SlowProcessMsgThreshold = 50 * time.Millisecond
 
 // Handler defines the method required for a server to handle a send or receive
 // of a Msg over a connection.
@@ -90,6 +96,33 @@ func LogMsg(ctx context.Context, c *Conn, m msg.Msg) {
 	}
 }
 
+func saveMsgMetrics(vars *expvar.Map, m msg.Msg) func() {
+	vars.Add("Msgs", 1)
+	if m.Type().IsRead() {
+		vars.Add("Msgs.Read", 1)
+	}
+	if m.Type().IsWrite() {
+		vars.Add("Msgs.Write", 1)
+	}
+	if m.Type().IsStd() {
+		vars.Add("Msgs."+m.Type().String(), 1)
+	}
+
+	if SlowProcessMsgThreshold > 0 {
+		start := time.Now()
+		return func() {
+			dur := time.Now().Sub(start)
+			if dur >= SlowProcessMsgThreshold {
+				vars.Add("SlowProcessMsg", 1)
+				if m.Type().IsStd() {
+					vars.Add("SlowProcessMsg."+m.Type().String(), 1)
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // ProcessMsg is a HandlerFunc that implements the default message
 // processing. For client messages, it calls the appropriate RPC
 // or pub-sub mechanisms. For server messages, it marshals
@@ -100,28 +133,15 @@ func LogMsg(ctx context.Context, c *Conn, m msg.Msg) {
 func ProcessMsg(ctx context.Context, c *Conn, m msg.Msg) {
 	addFn := func(string, int64) {}
 	if c.srv.Vars != nil {
-		addFn = c.srv.Vars.Add
-		addFn("Msgs", 1)
-		if m.Type().IsRead() {
-			addFn("ReadMsgs", 1)
-		}
-		if m.Type().IsWrite() {
-			addFn("WriteMsgs", 1)
+		if fn := saveMsgMetrics(c.srv.Vars, m); fn != nil {
+			defer fn()
 		}
 
-		start := time.Now()
-		defer func() {
-			dur := time.Now().Sub(start)
-			if dur > 50*time.Millisecond {
-				addFn("SlowProcessMsg", 1)
-			}
-		}()
+		addFn = c.srv.Vars.Add
 	}
 
 	switch m := m.(type) {
 	case *msg.Call:
-		addFn("CallMsgs", 1)
-
 		cp := &msg.CallPayload{
 			ConnUUID: c.UUID,
 			MsgUUID:  m.UUID(),
@@ -135,8 +155,6 @@ func ProcessMsg(ctx context.Context, c *Conn, m msg.Msg) {
 		c.Send(msg.NewOK(m))
 
 	case *msg.Pub:
-		addFn("PubMsgs", 1)
-
 		pp := &msg.PubPayload{
 			MsgUUID: m.UUID(),
 			Args:    m.Payload.Args,
@@ -148,8 +166,6 @@ func ProcessMsg(ctx context.Context, c *Conn, m msg.Msg) {
 		c.Send(msg.NewOK(m))
 
 	case *msg.Sub:
-		addFn("SubMsgs", 1)
-
 		if err := c.psc.Subscribe(m.Payload.Channel, m.Payload.Pattern); err != nil {
 			c.Send(msg.NewErr(m, 500, err))
 			return
@@ -157,8 +173,6 @@ func ProcessMsg(ctx context.Context, c *Conn, m msg.Msg) {
 		c.Send(msg.NewOK(m))
 
 	case *msg.Unsb:
-		addFn("UnsbMsgs", 1)
-
 		if err := c.psc.Unsubscribe(m.Payload.Channel, m.Payload.Pattern); err != nil {
 			c.Send(msg.NewErr(m, 500, err))
 			return
@@ -166,20 +180,16 @@ func ProcessMsg(ctx context.Context, c *Conn, m msg.Msg) {
 		c.Send(msg.NewOK(m))
 
 	case *msg.OK:
-		addFn("OKMsgs", 1)
 		doWrite(c, m, addFn)
 	case *msg.Err:
-		addFn("ErrMsgs", 1)
 		doWrite(c, m, addFn)
 	case *msg.Evnt:
-		addFn("EvntMsgs", 1)
 		doWrite(c, m, addFn)
 	case *msg.Res:
-		addFn("ResMsgs", 1)
 		doWrite(c, m, addFn)
 
 	default:
-		addFn("UnknownMsgs", 1)
+		addFn("Msgs.Unknown", 1)
 		logf(c.srv.LogFunc, "unknown message in ProcessMsg: %T", m)
 	}
 }
