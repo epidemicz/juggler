@@ -73,6 +73,7 @@ type Broker struct {
 }
 
 const (
+	// TODO : use redigo.NewScript for the scripts.
 	callOrResScript = `
 		redis.call("SET", KEYS[1], ARGV[1], "PX", tonumber(ARGV[1]))
 		local res = redis.call("LPUSH", KEYS[2], ARGV[2])
