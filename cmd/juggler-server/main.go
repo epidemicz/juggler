@@ -76,6 +76,7 @@ func main() {
 	srv := newServer(conf.Server, psb, cb, logFn)
 	srv.Handler = newHandler(conf.Server, logFn)
 	srv.Vars = expvar.NewMap("juggler")
+	juggler.SlowProcessMsgThreshold = conf.Server.SlowProcessMsgThreshold
 
 	upg := newUpgrader(conf.Server) // must be after newServer, for Subprotocols
 

@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/PuerkitoBio/juggler"
+
 	"gopkg.in/yaml.v2"
 )
 
@@ -47,8 +49,9 @@ type Server struct {
 	AllowEmptySubprotocol   bool          `yaml:"allow_empty_subprotocol"`
 
 	// handler options
-	CloseURI string `yaml:"close_uri"`
-	PanicURI string `yaml:"panic_uri"`
+	CloseURI                string        `yaml:"close_uri"`
+	PanicURI                string        `yaml:"panic_uri"`
+	SlowProcessMsgThreshold time.Duration `yaml:"slow_process_msg_threshold"`
 }
 
 // Config defines the configuration options of the server.
@@ -80,6 +83,7 @@ func getDefaultConfig() *Config {
 			AcquireWriteLockTimeout: 0,
 			AllowEmptySubprotocol:   *allowEmptyProtoFlag,
 			CloseURI:                "",
+			SlowProcessMsgThreshold: juggler.SlowProcessMsgThreshold,
 		},
 	}
 }
