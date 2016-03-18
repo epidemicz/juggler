@@ -1,6 +1,6 @@
 # juggler
 
 TODO :
-* run load tool in the cloud (docker cloud?)
+* run load tool in the cloud
 * redis cluster support and tests
 

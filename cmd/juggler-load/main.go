@@ -235,7 +235,6 @@ func main() {
 		Duration: *durationFlag,
 	}
 
-	// TODO : collect expvars before and after if flag is set
 	parsed, err := url.Parse(stats.Addr)
 	if err != nil {
 		log.Fatalf("failed to parse --addr: %v", err)
