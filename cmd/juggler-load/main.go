@@ -36,6 +36,7 @@ var (
 	callRateFlag    = flag.Duration("r", 100*time.Millisecond, "Call `rate` per connection.")
 	callTimeoutFlag = flag.Duration("t", time.Second, "Call `timeout`.")
 	uriFlag         = flag.String("u", "test.delay", "Call `URI`.")
+	waitFlag        = flag.Duration("w", 5*time.Second, "Wait `duration` for connections to stop.")
 )
 
 var (
@@ -93,6 +94,7 @@ OKMsgs:          {{.Before.Juggler.OKMsgs | printf "%-15d"}} {{.After.Juggler.OK
 ReadMsgs:        {{.Before.Juggler.ReadMsgs | printf "%-15d"}} {{.After.Juggler.ReadMsgs | printf "%-15d"}} {{subi .After.Juggler.ReadMsgs .Before.Juggler.ReadMsgs }}
 RecoveredPanics: {{.Before.Juggler.RecoveredPanics | printf "%-15d"}} {{.After.Juggler.RecoveredPanics | printf "%-15d"}} {{subi .After.Juggler.RecoveredPanics .Before.Juggler.RecoveredPanics }}
 ResMsgs:         {{.Before.Juggler.ResMsgs | printf "%-15d"}} {{.After.Juggler.ResMsgs | printf "%-15d"}} {{subi .After.Juggler.ResMsgs .Before.Juggler.ResMsgs }}
+SlowProcessMsg:         {{.Before.Juggler.SlowProcessMsg | printf "%-15d"}} {{.After.Juggler.SlowProcessMsg | printf "%-15d"}} {{subi .After.Juggler.SlowProcessMsg .Before.Juggler.SlowProcessMsg }}
 TotalConnGoros:  {{.Before.Juggler.TotalConnGoros | printf "%-15d"}} {{.After.Juggler.TotalConnGoros | printf "%-15d"}} {{subi .After.Juggler.TotalConnGoros .Before.Juggler.TotalConnGoros }}
 TotalConns:      {{.Before.Juggler.TotalConns | printf "%-15d"}} {{.After.Juggler.TotalConns | printf "%-15d"}} {{subi .After.Juggler.TotalConns .Before.Juggler.TotalConns }}
 WriteMsgs:       {{.Before.Juggler.WriteMsgs | printf "%-15d"}} {{.After.Juggler.WriteMsgs | printf "%-15d"}} {{subi .After.Juggler.WriteMsgs .Before.Juggler.WriteMsgs }}
@@ -193,6 +195,7 @@ type expVars struct {
 		ReadMsgs        int
 		RecoveredPanics int
 		ResMsgs         int
+		SlowProcessMsg  int
 		TotalConnGoros  int
 		TotalConns      int
 		WriteMsgs       int
@@ -274,7 +277,7 @@ func main() {
 		select {
 		case <-done:
 			return
-		case <-time.After(5 * time.Second):
+		case <-time.After(*waitFlag):
 			log.Fatalf("failed to stop clients")
 		}
 	}()
@@ -284,8 +287,6 @@ func main() {
 	stats.ActualDuration = end.Sub(start)
 	log.Printf("stopped.")
 
-	// wait a bit for server counters to settle
-	time.Sleep(time.Second)
 	after := getExpVars(parsed)
 
 	ts := templateStats{Run: stats, Before: before, After: after}

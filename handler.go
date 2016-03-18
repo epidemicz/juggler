@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"runtime"
+	"time"
 
 	"golang.org/x/net/context"
 
@@ -107,6 +108,14 @@ func ProcessMsg(ctx context.Context, c *Conn, m msg.Msg) {
 		if m.Type().IsWrite() {
 			addFn("WriteMsgs", 1)
 		}
+
+		start := time.Now()
+		defer func() {
+			dur := time.Now().Sub(start)
+			if dur > 50*time.Millisecond {
+				addFn("SlowProcessMsg", 1)
+			}
+		}()
 	}
 
 	switch m := m.(type) {
