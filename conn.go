@@ -218,12 +218,8 @@ func (c *Conn) results() {
 	}
 
 	ch := c.resc.Results()
-	last := time.Now()
 	for res := range ch {
-		logf(c.srv.LogFunc, "%s: results payload for %s", c.UUID, res.MsgUUID)
 		c.Send(msg.NewRes(res))
-		logf(c.srv.LogFunc, "%s: results payload for %s after %s", c.UUID, res.MsgUUID, time.Now().Sub(last))
-		last = time.Now()
 	}
 
 	// results loop was stopped, the connection should be closed if it

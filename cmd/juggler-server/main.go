@@ -328,8 +328,10 @@ func newServer(conf *Server, pubSub broker.PubSubBroker, caller broker.CallerBro
 	}
 
 	cs := juggler.LogConn
+	lf := (func(string, ...interface{}))(nil)
 	if *noLogFlag {
 		cs = nil
+		lf = juggler.DiscardLog
 	}
 	return &juggler.Server{
 		ReadLimit:               conf.ReadLimit,
@@ -340,6 +342,7 @@ func newServer(conf *Server, pubSub broker.PubSubBroker, caller broker.CallerBro
 		ConnState:               cs,
 		PubSubBroker:            pubSub,
 		CallerBroker:            caller,
+		LogFunc:                 lf,
 	}
 }
 
