@@ -9,8 +9,10 @@ package main
 
 import (
 	"encoding/json"
+	"expvar"
 	"flag"
 	"log"
+	"net/http"
 	"strconv"
 	"sync"
 	"time"
@@ -30,6 +32,7 @@ var (
 	brokerResultCapFlag       = flag.Int("broker-result-cap", 100, "Capacity of the `results` queue.")
 	brokerBlockingTimeoutFlag = flag.Duration("broker-blocking-timeout", 0, "Blocking `timeout` when polling for call requests.")
 	workersFlag               = flag.Int("workers", 1, "Number of concurrent `workers` processing call requests.")
+	httpServerAddrFlag        = flag.String("addr", ":9001", "HTTP server `address` to serve debug endpoints.")
 	helpFlag                  = flag.Bool("help", false, "Show help.")
 )
 
@@ -52,8 +55,14 @@ func main() {
 	pool := newRedisPool(*redisAddrFlag)
 	c := &callee.Callee{Broker: newBroker(pool)}
 
-	log.Printf("listening for call requests on %s with %d workers", *redisAddrFlag, *workersFlag)
+	vars := expvar.NewMap("callee")
 
+	// start a web server to serve pprof and expvar data
+	go func() {
+		log.Println(http.ListenAndServe(*httpServerAddrFlag, nil))
+	}()
+
+	log.Printf("listening for call requests on %s with %d workers", *redisAddrFlag, *workersFlag)
 	keys := make([]string, 0, len(uris))
 	for k := range uris {
 		keys = append(keys, k)
@@ -74,15 +83,24 @@ func main() {
 			ch := cc.Calls()
 			for cp := range ch {
 				log.Printf("received request %v %s", cp.MsgUUID, cp.URI)
+				vars.Add("Requests", 1)
+				vars.Add("Requests."+cp.URI, 1)
+
 				if err := c.InvokeAndStoreResult(cp, uris[cp.URI]); err != nil {
 					if err != callee.ErrCallExpired {
 						log.Printf("InvokeAndStoreResult failed: %v", err)
+						vars.Add("Failed", 1)
+						vars.Add("Failed."+cp.URI, 1)
 						continue
 					}
 					log.Printf("expired request %v %s", cp.MsgUUID, cp.URI)
+					vars.Add("Expired", 1)
+					vars.Add("Expired."+cp.URI, 1)
 					continue
 				}
 				log.Printf("sent result %v %s", cp.MsgUUID, cp.URI)
+				vars.Add("Succeeded", 1)
+				vars.Add("Succeded."+cp.URI, 1)
 			}
 		}()
 	}
