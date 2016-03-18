@@ -271,18 +271,30 @@ func newHandler(conf *Server) juggler.Handler {
 }
 
 func newPubSubBroker(pool *redis.Pool) broker.PubSubBroker {
+	lf := (func(string, ...interface{}))(nil)
+	if *noLogFlag {
+		lf = juggler.DiscardLog
+	}
+
 	return &redisbroker.Broker{
-		Pool: pool,
-		Dial: pool.Dial,
+		Pool:    pool,
+		Dial:    pool.Dial,
+		LogFunc: lf,
 	}
 }
 
 func newCallerBroker(conf *CallerBroker, pool *redis.Pool) broker.CallerBroker {
+	lf := (func(string, ...interface{}))(nil)
+	if *noLogFlag {
+		lf = juggler.DiscardLog
+	}
+
 	return &redisbroker.Broker{
 		Pool:            pool,
 		Dial:            pool.Dial,
 		BlockingTimeout: conf.BlockingTimeout,
 		CallCap:         conf.CallCap,
+		LogFunc:         lf,
 	}
 }
 
