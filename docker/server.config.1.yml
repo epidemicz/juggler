@@ -1,10 +1,12 @@
 server:
     close_uri: test.close
     panic_uri: test.panic
+    slow_process_msg_threshold: 30ms
 
 caller_broker:
     call_cap: 10000
 
 redis:
     addr: redis:6379
+    max_idle: 1000
 
