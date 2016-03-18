@@ -74,7 +74,7 @@ func main() {
 	cb := newCallerBroker(conf.CallerBroker, poolc, logFn)
 
 	srv := newServer(conf.Server, psb, cb, logFn)
-	srv.Handler = newHandler(conf.Server)
+	srv.Handler = newHandler(conf.Server, logFn)
 	srv.Vars = expvar.NewMap("juggler")
 
 	upg := newUpgrader(conf.Server) // must be after newServer, for Subprotocols
@@ -86,13 +86,13 @@ func main() {
 
 	httpSrv := newHTTPServer(conf.Server)
 
-	log.Printf("listening for connections on %s", conf.Server.Addr)
+	logFn("listening for connections on %s", conf.Server.Addr)
 	if err := httpSrv.ListenAndServe(); err != nil {
 		log.Fatalf("ListenAndServe failed: %v", err)
 	}
 }
 
-func newHandler(conf *Server) juggler.Handler {
+func newHandler(conf *Server, logFn func(string, ...interface{})) juggler.Handler {
 	closeURI := conf.CloseURI
 	panicURI := conf.PanicURI
 	writeTimeout := conf.WriteTimeout
@@ -112,7 +112,7 @@ func newHandler(conf *Server) juggler.Handler {
 					websocket.FormatCloseMessage(websocket.CloseNormalClosure, "bye"),
 					deadline); err != nil {
 
-					log.Printf("WriteControl failed: %v", err)
+					logFn("WriteControl failed: %v", err)
 				}
 				return
 
