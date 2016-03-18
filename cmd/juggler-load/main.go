@@ -87,17 +87,21 @@ Counter          Before          After           Diff.
 ----------------------------------------------------------------
 ActiveConnGoros: {{.Before.Juggler.ActiveConnGoros | printf "%-15d"}} {{.After.Juggler.ActiveConnGoros | printf "%-15d"}} {{subi .After.Juggler.ActiveConnGoros .Before.Juggler.ActiveConnGoros }}
 ActiveConns:     {{.Before.Juggler.ActiveConns | printf "%-15d"}} {{.After.Juggler.ActiveConns | printf "%-15d"}} {{subi .After.Juggler.ActiveConns .Before.Juggler.ActiveConns }}
-CallMsgs:        {{.Before.Juggler.CallMsgs | printf "%-15d"}} {{.After.Juggler.CallMsgs | printf "%-15d"}} {{subi .After.Juggler.CallMsgs .Before.Juggler.CallMsgs }}
-ErrMsgs:         {{.Before.Juggler.ErrMsgs | printf "%-15d"}} {{.After.Juggler.ErrMsgs | printf "%-15d"}} {{subi .After.Juggler.ErrMsgs .Before.Juggler.ErrMsgs }}
+MsgsRead:        {{.Before.Juggler.MsgsRead | printf "%-15d"}} {{.After.Juggler.MsgsRead | printf "%-15d"}} {{subi .After.Juggler.MsgsRead .Before.Juggler.MsgsRead }}
+MsgsWrite:       {{.Before.Juggler.MsgsWrite | printf "%-15d"}} {{.After.Juggler.MsgsWrite | printf "%-15d"}} {{subi .After.Juggler.MsgsWrite .Before.Juggler.MsgsWrite }}
+MsgsCALL:        {{.Before.Juggler.MsgsCALL | printf "%-15d"}} {{.After.Juggler.MsgsCALL | printf "%-15d"}} {{subi .After.Juggler.MsgsCALL .Before.Juggler.MsgsCALL }}
+MsgsOK:          {{.Before.Juggler.MsgsOK | printf "%-15d"}} {{.After.Juggler.MsgsOK | printf "%-15d"}} {{subi .After.Juggler.MsgsOK .Before.Juggler.MsgsOK }}
+MsgsERR:         {{.Before.Juggler.MsgsERR | printf "%-15d"}} {{.After.Juggler.MsgsERR | printf "%-15d"}} {{subi .After.Juggler.MsgsERR .Before.Juggler.MsgsERR }}
 Msgs:            {{.Before.Juggler.Msgs | printf "%-15d"}} {{.After.Juggler.Msgs | printf "%-15d"}} {{subi .After.Juggler.Msgs .Before.Juggler.Msgs }}
-OKMsgs:          {{.Before.Juggler.OKMsgs | printf "%-15d"}} {{.After.Juggler.OKMsgs | printf "%-15d"}} {{subi .After.Juggler.OKMsgs .Before.Juggler.OKMsgs }}
-ReadMsgs:        {{.Before.Juggler.ReadMsgs | printf "%-15d"}} {{.After.Juggler.ReadMsgs | printf "%-15d"}} {{subi .After.Juggler.ReadMsgs .Before.Juggler.ReadMsgs }}
+MsgsRES:         {{.Before.Juggler.ResMsgs | printf "%-15d"}} {{.After.Juggler.ResMsgs | printf "%-15d"}} {{subi .After.Juggler.ResMsgs .Before.Juggler.ResMsgs }}
 RecoveredPanics: {{.Before.Juggler.RecoveredPanics | printf "%-15d"}} {{.After.Juggler.RecoveredPanics | printf "%-15d"}} {{subi .After.Juggler.RecoveredPanics .Before.Juggler.RecoveredPanics }}
-ResMsgs:         {{.Before.Juggler.ResMsgs | printf "%-15d"}} {{.After.Juggler.ResMsgs | printf "%-15d"}} {{subi .After.Juggler.ResMsgs .Before.Juggler.ResMsgs }}
 SlowProcessMsg:  {{.Before.Juggler.SlowProcessMsg | printf "%-15d"}} {{.After.Juggler.SlowProcessMsg | printf "%-15d"}} {{subi .After.Juggler.SlowProcessMsg .Before.Juggler.SlowProcessMsg }}
+SlowProcessMsgCALL:  {{.Before.Juggler.SlowProcessMsgCALL | printf "%-15d"}} {{.After.Juggler.SlowProcessMsgCALL | printf "%-15d"}} {{subi .After.Juggler.SlowProcessMsgCALL .Before.Juggler.SlowProcessMsgCALL }}
+SlowProcessMsgOK:  {{.Before.Juggler.SlowProcessMsgOK | printf "%-15d"}} {{.After.Juggler.SlowProcessMsgOK | printf "%-15d"}} {{subi .After.Juggler.SlowProcessMsgOK .Before.Juggler.SlowProcessMsgOK }}
+SlowProcessMsgERR:  {{.Before.Juggler.SlowProcessMsgERR | printf "%-15d"}} {{.After.Juggler.SlowProcessMsgERR | printf "%-15d"}} {{subi .After.Juggler.SlowProcessMsgERR .Before.Juggler.SlowProcessMsgERR }}
+SlowProcessMsgRES:  {{.Before.Juggler.SlowProcessMsgRES | printf "%-15d"}} {{.After.Juggler.SlowProcessMsgRES | printf "%-15d"}} {{subi .After.Juggler.SlowProcessMsgRES .Before.Juggler.SlowProcessMsgRES }}
 TotalConnGoros:  {{.Before.Juggler.TotalConnGoros | printf "%-15d"}} {{.After.Juggler.TotalConnGoros | printf "%-15d"}} {{subi .After.Juggler.TotalConnGoros .Before.Juggler.TotalConnGoros }}
 TotalConns:      {{.Before.Juggler.TotalConns | printf "%-15d"}} {{.After.Juggler.TotalConns | printf "%-15d"}} {{subi .After.Juggler.TotalConns .Before.Juggler.TotalConns }}
-WriteMsgs:       {{.Before.Juggler.WriteMsgs | printf "%-15d"}} {{.After.Juggler.WriteMsgs | printf "%-15d"}} {{subi .After.Juggler.WriteMsgs .Before.Juggler.WriteMsgs }}
 
 `))
 )
@@ -186,19 +190,23 @@ type runStats struct {
 
 type expVars struct {
 	Juggler struct {
-		ActiveConnGoros int
-		ActiveConns     int
-		CallMsgs        int
-		ErrMsgs         int
-		Msgs            int
-		OKMsgs          int
-		ReadMsgs        int
-		RecoveredPanics int
-		ResMsgs         int
-		SlowProcessMsg  int
-		TotalConnGoros  int
-		TotalConns      int
-		WriteMsgs       int
+		ActiveConnGoros    int
+		ActiveConns        int
+		MsgsCALL           int
+		MsgsERR            int
+		Msgs               int
+		MsgsOK             int
+		MsgsRead           int
+		RecoveredPanics    int
+		MsgsRES            int
+		SlowProcessMsg     int
+		SlowProcessMsgCALL int
+		SlowProcessMsgERR  int
+		SlowProcessMsgOK   int
+		SlowProcessMsgRES  int
+		TotalConnGoros     int
+		TotalConns         int
+		MsgsWrite          int
 	}
 
 	Memstats struct {

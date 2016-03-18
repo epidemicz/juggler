@@ -99,13 +99,13 @@ func LogMsg(ctx context.Context, c *Conn, m msg.Msg) {
 func saveMsgMetrics(vars *expvar.Map, m msg.Msg) func() {
 	vars.Add("Msgs", 1)
 	if m.Type().IsRead() {
-		vars.Add("Msgs.Read", 1)
+		vars.Add("MsgsRead", 1)
 	}
 	if m.Type().IsWrite() {
-		vars.Add("Msgs.Write", 1)
+		vars.Add("MsgsWrite", 1)
 	}
 	if m.Type().IsStd() {
-		vars.Add("Msgs."+m.Type().String(), 1)
+		vars.Add("Msgs"+m.Type().String(), 1)
 	}
 
 	if SlowProcessMsgThreshold > 0 {
@@ -115,7 +115,7 @@ func saveMsgMetrics(vars *expvar.Map, m msg.Msg) func() {
 			if dur >= SlowProcessMsgThreshold {
 				vars.Add("SlowProcessMsg", 1)
 				if m.Type().IsStd() {
-					vars.Add("SlowProcessMsg."+m.Type().String(), 1)
+					vars.Add("SlowProcessMsg"+m.Type().String(), 1)
 				}
 			}
 		}
@@ -189,7 +189,7 @@ func ProcessMsg(ctx context.Context, c *Conn, m msg.Msg) {
 		doWrite(c, m, addFn)
 
 	default:
-		addFn("Msgs.Unknown", 1)
+		addFn("MsgsUnknown", 1)
 		logf(c.srv.LogFunc, "unknown message in ProcessMsg: %T", m)
 	}
 }
