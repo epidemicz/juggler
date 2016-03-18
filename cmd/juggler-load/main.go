@@ -83,7 +83,7 @@ StackInuse:     {{.Before.Memstats.StackInuse | printf "%-15v"}} {{.After.Memsta
 NumGC:          {{.Before.Memstats.NumGC | printf "%-15d"}} {{.After.Memstats.NumGC | printf "%-15d"}} {{subi .After.Memstats.NumGC .Before.Memstats.NumGC }}
 PauseTotalNs:   {{.Before.Memstats.PauseTotalNs | printf "%-15v"}} {{.After.Memstats.PauseTotalNs | printf "%-15v"}} {{subd .After.Memstats.PauseTotalNs .Before.Memstats.PauseTotalNs | printf "%v" }}
 
-Counter          Before          After           Diff.
+Counter             Before          After           Diff.
 ----------------------------------------------------------------
 ActiveConnGoros:    {{.Before.Juggler.ActiveConnGoros | printf "%-15d"}} {{.After.Juggler.ActiveConnGoros | printf "%-15d"}} {{subi .After.Juggler.ActiveConnGoros .Before.Juggler.ActiveConnGoros }}
 ActiveConns:        {{.Before.Juggler.ActiveConns | printf "%-15d"}} {{.After.Juggler.ActiveConns | printf "%-15d"}} {{subi .After.Juggler.ActiveConns .Before.Juggler.ActiveConns }}
