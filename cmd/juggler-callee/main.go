@@ -25,15 +25,16 @@ import (
 )
 
 var (
+	brokerBlockingTimeoutFlag = flag.Duration("broker-blocking-timeout", 0, "Blocking `timeout` when polling for call requests.")
+	brokerResultCapFlag       = flag.Int("broker-result-cap", 100, "Capacity of the `results` queue.")
+	helpFlag                  = flag.Bool("help", false, "Show help.")
+	numDelayURIsFlag          = flag.Int("n", 100, "Number of test.delay `URIs`.")
 	redisAddrFlag             = flag.String("redis", ":6379", "Redis `address`.")
+	httpServerPortFlag        = flag.Int("port", 9001, "HTTP server `port` to serve debug endpoints.")
+	redisPoolIdleTimeoutFlag  = flag.Duration("redis-idle-timeout", time.Minute, "Redis idle connection `timeout`.")
 	redisPoolMaxActiveFlag    = flag.Int("redis-max-active", 100, "Maximum active redis `connections`.")
 	redisPoolMaxIdleFlag      = flag.Int("redis-max-idle", 10, "Maximum idle redis `connections`.")
-	redisPoolIdleTimeoutFlag  = flag.Duration("redis-idle-timeout", time.Minute, "Redis idle connection `timeout`.")
-	brokerResultCapFlag       = flag.Int("broker-result-cap", 100, "Capacity of the `results` queue.")
-	brokerBlockingTimeoutFlag = flag.Duration("broker-blocking-timeout", 0, "Blocking `timeout` when polling for call requests.")
 	workersFlag               = flag.Int("workers", 1, "Number of concurrent `workers` processing call requests.")
-	httpServerPortFlag        = flag.Int("port", 9001, "HTTP server `port` to serve debug endpoints.")
-	helpFlag                  = flag.Bool("help", false, "Show help.")
 )
 
 var uris = map[string]callee.Thunk{
@@ -50,6 +51,10 @@ func main() {
 	}
 	if *workersFlag <= 0 {
 		*workersFlag = 1
+	}
+
+	for i := 0; i < *numDelayURIsFlag; i++ {
+		uris["test.delay."+strconv.Itoa(i)] = delayThunk
 	}
 
 	pool := newRedisPool(*redisAddrFlag)
