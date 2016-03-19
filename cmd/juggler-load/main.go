@@ -46,6 +46,7 @@ var (
 		"subi": subiFn,
 		"subd": subdFn,
 		"subf": subfFn,
+		"avg":  avgFn,
 	}
 
 	tpl = template.Must(template.New("output").Funcs(fnMap).Parse(`
@@ -69,6 +70,10 @@ OK:              {{ .Run.OK }}
 Errors:          {{ .Run.Err }}
 Results:         {{ .Run.Res }}
 Expired:         {{ .Run.Exp }}
+
+--- CLIENT LATENCIES
+
+Average Result: {{ avg .Latencies }}
 
 --- SERVER STATISTICS
 
@@ -120,6 +125,18 @@ func subfFn(a, b byteSize) byteSize {
 	return a - b
 }
 
+func avgFn(durs []time.Duration) time.Duration {
+	var sum time.Duration
+
+	if len(durs) == 0 {
+		return 0
+	}
+	for _, d := range durs {
+		sum += d
+	}
+	return sum / time.Duration(len(durs))
+}
+
 // Copied from effective Go : https://golang.org/doc/effective_go.html#constants
 // Copyright 2009 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
@@ -166,9 +183,10 @@ func (b byteSize) String() string {
 }
 
 type templateStats struct {
-	Run    *runStats
-	Before *expVars
-	After  *expVars
+	Run       *runStats
+	Before    *expVars
+	After     *expVars
+	Latencies []time.Duration
 }
 
 type runStats struct {
@@ -263,12 +281,10 @@ func main() {
 	before := getExpVars(parsed)
 
 	clientStarted := make(chan struct{})
-	wg := sync.WaitGroup{}
-	wg.Add(stats.Conns)
-
+	resLatency := make(chan []time.Duration)
 	stop := make(chan struct{})
 	for i := 0; i < stats.Conns; i++ {
-		go runClient(stats, &wg, clientStarted, stop)
+		go runClient(stats, clientStarted, stop, resLatency)
 	}
 
 	// start clients with some jitter, up to 10ms
@@ -294,15 +310,20 @@ func main() {
 			log.Fatalf("failed to stop clients")
 		}
 	}()
-	wg.Wait()
+
+	var latencies []time.Duration
+	for i := 0; i < stats.Conns; i++ {
+		latencies = append(latencies, <-resLatency...)
+	}
 	close(done)
+
 	end := time.Now()
 	stats.ActualDuration = end.Sub(start)
 	log.Printf("stopped.")
 
 	after := getExpVars(parsed)
 
-	ts := templateStats{Run: stats, Before: before, After: after}
+	ts := templateStats{Run: stats, Before: before, After: after, Latencies: latencies}
 	if err := tpl.Execute(os.Stdout, ts); err != nil {
 		log.Fatalf("template.Execute failed: %v", err)
 	}
@@ -334,10 +355,11 @@ func getURI(stats *runStats) string {
 	return uri
 }
 
-func runClient(stats *runStats, wg *sync.WaitGroup, started chan<- struct{}, stop <-chan struct{}) {
-	defer wg.Done()
-
+func runClient(stats *runStats, started chan<- struct{}, stop <-chan struct{}, resLatencies chan<- []time.Duration) {
 	var wgResults sync.WaitGroup
+	var mu sync.Mutex // protects latencies slice
+	var latencies []time.Duration
+	startTimes := make(map[string]time.Time)
 
 	cli, err := client.Dial(
 		&websocket.Dialer{Subprotocols: []string{stats.Protocol}},
@@ -346,6 +368,9 @@ func runClient(stats *runStats, wg *sync.WaitGroup, started chan<- struct{}, sto
 		client.SetHandler(client.HandlerFunc(func(ctx context.Context, c *client.Client, m msg.Msg) {
 			switch m.Type() {
 			case msg.ResMsg:
+				mu.Lock()
+				latencies = append(latencies, time.Now().Sub(startTimes[m.UUID().String()]))
+				mu.Unlock()
 				atomic.AddInt64(&stats.Res, 1)
 			case client.ExpMsg:
 				atomic.AddInt64(&stats.Exp, 1)
@@ -376,10 +401,11 @@ loop:
 
 		wgResults.Add(1)
 		atomic.AddInt64(&stats.Calls, 1)
-		_, err := cli.Call(getURI(stats), stats.Payload, stats.Timeout)
+		uid, err := cli.Call(getURI(stats), stats.Payload, stats.Timeout)
 		if err != nil {
 			log.Fatalf("Call failed: %v", err)
 		}
+		startTimes[uid.String()] = time.Now()
 		after = stats.Rate
 	}
 	// wait for sent calls to return or expire
@@ -388,4 +414,5 @@ loop:
 	if err := cli.Close(); err != nil {
 		log.Fatalf("Close failed: %v", err)
 	}
+	resLatencies <- latencies
 }
