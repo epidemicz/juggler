@@ -16,6 +16,7 @@ package redisbroker
 
 import (
 	"encoding/json"
+	"expvar"
 	"fmt"
 	"log"
 	"time"
@@ -72,9 +73,7 @@ type Broker struct {
 	ResultCap int
 }
 
-const (
-	// TODO : use redigo.NewScript for the scripts.
-	callOrResScript = `
+var callOrResScript = redis.NewScript(2, `
 		redis.call("SET", KEYS[1], ARGV[1], "PX", tonumber(ARGV[1]))
 		local res = redis.call("LPUSH", KEYS[2], ARGV[2])
 		local limit = tonumber(ARGV[3])
@@ -84,8 +83,9 @@ const (
 			return redis.error_reply("list capacity exceeded")
 		end
 		return res
-	`
+	`)
 
+const (
 	// redis cluster-compliant keys, so that both keys are in the same slot
 	callKey        = "juggler:calls:{%s}"            // 1: URI
 	callTimeoutKey = "juggler:calls:timeout:{%s}:%s" // 1: URI, 2: mUUID
@@ -109,7 +109,16 @@ func (b *Broker) Result(rp *msg.ResPayload, timeout time.Duration) error {
 	return registerCallOrRes(b.Pool, rp, timeout, b.ResultCap, k1, k2)
 }
 
+var slowVar = expvar.NewInt("SlowCallOrRes")
+
 func registerCallOrRes(pool Pool, pld interface{}, timeout time.Duration, cap int, k1, k2 string) error {
+	start := time.Now()
+	defer func() {
+		if time.Now().Sub(start) > 30*time.Millisecond {
+			slowVar.Add(1)
+		}
+	}()
+
 	p, err := json.Marshal(pld)
 	if err != nil {
 		return err
@@ -123,9 +132,7 @@ func registerCallOrRes(pool Pool, pld interface{}, timeout time.Duration, cap in
 		to = int(broker.DefaultCallTimeout / time.Millisecond)
 	}
 
-	_, err = rc.Do("EVAL",
-		callOrResScript,
-		2,   // the number of keys
+	_, err = callOrResScript.Do(rc,
 		k1,  // key[1] : the SET key with expiration
 		k2,  // key[2] : the LIST key
 		to,  // argv[1] : the timeout in milliseconds
