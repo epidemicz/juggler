@@ -2,6 +2,7 @@ package redisbroker
 
 import (
 	"encoding/json"
+	"expvar"
 	"fmt"
 	"sync"
 	"time"
@@ -13,13 +14,11 @@ import (
 
 var _ broker.CallsConn = (*callsConn)(nil)
 
-const (
-	delAndPTTLScript = `
+var delAndPTTLScript = redis.NewScript(1, `
 		local res = redis.call("PTTL", KEYS[1])
 		redis.call("DEL", KEYS[1])
 		return res
-	`
-)
+	`)
 
 type callsConn struct {
 	c       redis.Conn
@@ -52,6 +51,11 @@ func (c *callsConn) CallsErr() error {
 	c.errmu.Unlock()
 	return err
 }
+
+var (
+	pttlCallFailed = expvar.NewInt("CallPTTLFailed")
+	callExpired    = expvar.NewInt("CallExpired")
+)
 
 // Calls returns a stream of call requests for the URIs specified when
 // creating the callsConn.
@@ -96,12 +100,14 @@ func (c *callsConn) Calls() <-chan *msg.CallPayload {
 
 				// check if call is expired
 				k := fmt.Sprintf(callTimeoutKey, cp.URI, cp.MsgUUID)
-				pttl, err := redis.Int(c.c.Do("EVAL", delAndPTTLScript, 1, k))
+				pttl, err := redis.Int(delAndPTTLScript.Do(c.c, k))
 				if err != nil {
+					pttlCallFailed.Add(1)
 					logf(c.logFn, "Calls: DEL/PTTL failed: %v", err)
 					continue
 				}
 				if pttl <= 0 {
+					callExpired.Add(1)
 					logf(c.logFn, "Calls: message %v expired, dropping call", cp.MsgUUID)
 					continue
 				}

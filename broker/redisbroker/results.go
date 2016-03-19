@@ -1,6 +1,7 @@
 package redisbroker
 
 import (
+	"expvar"
 	"fmt"
 	"sync"
 	"time"
@@ -45,6 +46,11 @@ func (c *resultsConn) ResultsErr() error {
 	return err
 }
 
+var (
+	pttlResFailed = expvar.NewInt("ResultPTTLFailed")
+	resExpired    = expvar.NewInt("ResultExpired")
+)
+
 // Results returns a stream of call results for the connUUID specified when
 // creating the resultsConn.
 func (c *resultsConn) Results() <-chan *msg.ResPayload {
@@ -83,12 +89,14 @@ func (c *resultsConn) Results() <-chan *msg.ResPayload {
 
 				// check if call is expired
 				k := fmt.Sprintf(resTimeoutKey, rp.ConnUUID, rp.MsgUUID)
-				pttl, err := redis.Int(c.c.Do("EVAL", delAndPTTLScript, 1, k))
+				pttl, err := redis.Int(delAndPTTLScript.Do(c.c, k))
 				if err != nil {
+					pttlResFailed.Add(1)
 					logf(c.logFn, "Results: DEL/PTTL failed: %v", err)
 					continue
 				}
 				if pttl <= 0 {
+					resExpired.Add(1)
 					logf(c.logFn, "Results: message %v expired, dropping call", rp.MsgUUID)
 					continue
 				}

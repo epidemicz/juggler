@@ -24,6 +24,8 @@ services:
             dockerfile: Dockerfile.callee
         command: ["./juggler-callee", "--redis", "redisc:6379", "--workers", "100", "-n", "100", "--redis-max-idle", "1000"]
         entrypoint: ./docker/docker_start.2.sh
+        ports:
+            - 9001:9001
 
     client:
         build:
