@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -47,6 +48,7 @@ var (
 		"subd": subdFn,
 		"subf": subfFn,
 		"avg":  avgFn,
+		"med":  medFn,
 	}
 
 	tpl = template.Must(template.New("output").Funcs(fnMap).Parse(`
@@ -73,7 +75,8 @@ Expired:         {{ .Run.Exp }}
 
 --- CLIENT LATENCIES
 
-Average Result: {{ avg .Latencies }}
+Average: {{ avg .Latencies }}
+Median:  {{ med .Latencies }}
 
 --- SERVER STATISTICS
 
@@ -136,6 +139,27 @@ func avgFn(durs []time.Duration) time.Duration {
 		sum += d
 	}
 	return sum / time.Duration(len(durs))
+}
+
+type durations []time.Duration
+
+func (d durations) Len() int           { return len(d) }
+func (d durations) Swap(x, y int)      { d[x], d[y] = d[y], d[x] }
+func (d durations) Less(x, y int) bool { return d[x] < d[y] }
+
+func medFn(durs []time.Duration) time.Duration {
+	if len(durs) == 0 {
+		return 0
+	}
+	sort.Sort(durations(durs))
+	ix := len(durs) / 2
+	v := durs[ix]
+	if len(durs)%2 == 0 {
+		// even, take the avg of ix and ix-1
+		v += durs[ix-1]
+		v /= 2
+	}
+	return v
 }
 
 // Copied from effective Go : https://golang.org/doc/effective_go.html#constants
