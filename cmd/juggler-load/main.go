@@ -131,6 +131,7 @@ func avgFn(durs []time.Duration) time.Duration {
 	if len(durs) == 0 {
 		return 0
 	}
+
 	for _, d := range durs {
 		sum += d
 	}
@@ -357,7 +358,7 @@ func getURI(stats *runStats) string {
 
 func runClient(stats *runStats, started chan<- struct{}, stop <-chan struct{}, resLatencies chan<- []time.Duration) {
 	var wgResults sync.WaitGroup
-	var mu sync.Mutex // protects latencies slice
+	var mu sync.Mutex // protects latencies slice and startTimes map
 	var latencies []time.Duration
 	startTimes := make(map[string]time.Time)
 
@@ -368,8 +369,10 @@ func runClient(stats *runStats, started chan<- struct{}, stop <-chan struct{}, r
 		client.SetHandler(client.HandlerFunc(func(ctx context.Context, c *client.Client, m msg.Msg) {
 			switch m.Type() {
 			case msg.ResMsg:
+				rm := m.(*msg.Res)
 				mu.Lock()
-				latencies = append(latencies, time.Now().Sub(startTimes[m.UUID().String()]))
+				dur := time.Now().Sub(startTimes[rm.Payload.For.String()])
+				latencies = append(latencies, dur)
 				mu.Unlock()
 				atomic.AddInt64(&stats.Res, 1)
 			case client.ExpMsg:
@@ -405,7 +408,9 @@ loop:
 		if err != nil {
 			log.Fatalf("Call failed: %v", err)
 		}
+		mu.Lock()
 		startTimes[uid.String()] = time.Now()
+		mu.Unlock()
 		after = stats.Rate
 	}
 	// wait for sent calls to return or expire
