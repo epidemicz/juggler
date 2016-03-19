@@ -54,7 +54,7 @@ var (
 Address:    {{ .Run.Addr }}
 Protocol:   {{ .Run.Protocol }}
 URI:        {{ .Run.URI }} x {{.Run.NURIs}}
-Call Delay: {{ .Run.Payload }}
+Payload:    {{ .Run.Payload }}
 
 Connections: {{ .Run.Conns }}
 Rate:        {{ .Run.Rate | printf "%s" }}
