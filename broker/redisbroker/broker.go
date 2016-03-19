@@ -16,7 +16,6 @@ package redisbroker
 
 import (
 	"encoding/json"
-	"expvar"
 	"fmt"
 	"log"
 	"time"
@@ -109,16 +108,7 @@ func (b *Broker) Result(rp *msg.ResPayload, timeout time.Duration) error {
 	return registerCallOrRes(b.Pool, rp, timeout, b.ResultCap, k1, k2)
 }
 
-var slowVar = expvar.NewInt("SlowCallOrRes")
-
 func registerCallOrRes(pool Pool, pld interface{}, timeout time.Duration, cap int, k1, k2 string) error {
-	start := time.Now()
-	defer func() {
-		if time.Now().Sub(start) > 30*time.Millisecond {
-			slowVar.Add(1)
-		}
-	}()
-
 	p, err := json.Marshal(pld)
 	if err != nil {
 		return err
