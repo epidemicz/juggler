@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"text/template"
@@ -31,6 +32,7 @@ var (
 	durationFlag    = flag.Duration("d", 10*time.Second, "Run `duration`.")
 	delayFlag       = flag.Duration("delay", 0, "Start execution after `delay`.")
 	helpFlag        = flag.Bool("help", false, "Show help.")
+	numURIsFlag     = flag.Int("n", 1, "Spread calls to this `number` of URIs (added as a suffix to the URI).")
 	payloadFlag     = flag.String("p", "100", "Call `payload`.")
 	subprotoFlag    = flag.String("proto", "juggler.0", "Websocket `subprotocol`.")
 	callRateFlag    = flag.Duration("r", 100*time.Millisecond, "Call `rate` per connection.")
@@ -51,7 +53,7 @@ var (
 
 Address:    {{ .Run.Addr }}
 Protocol:   {{ .Run.Protocol }}
-URI:        {{ .Run.URI }}
+URI:        {{ .Run.URI }} x {{.Run.NURIs}}
 Call Delay: {{ .Run.Payload }}
 
 Connections: {{ .Run.Conns }}
@@ -173,6 +175,7 @@ type runStats struct {
 	Addr     string
 	Protocol string
 	URI      string
+	NURIs    int
 	Payload  string
 
 	Conns          int
@@ -237,11 +240,13 @@ func main() {
 	}
 
 	<-time.After(*delayFlag)
+	rand.Seed(time.Now().UnixNano())
 
 	stats := &runStats{
 		Addr:     *addrFlag,
 		Protocol: *subprotoFlag,
 		URI:      *uriFlag,
+		NURIs:    *numURIsFlag,
 		Payload:  *payloadFlag,
 		Conns:    *connFlag,
 		Rate:     *callRateFlag,
@@ -320,6 +325,15 @@ func getExpVars(u *url.URL) *expVars {
 	return &ev
 }
 
+func getURI(stats *runStats) string {
+	uri := stats.URI
+	if stats.NURIs > 0 {
+		n := rand.Intn(stats.NURIs)
+		uri += "." + strconv.Itoa(n)
+	}
+	return uri
+}
+
 func runClient(stats *runStats, wg *sync.WaitGroup, started chan<- struct{}, stop <-chan struct{}) {
 	defer wg.Done()
 
@@ -362,7 +376,7 @@ loop:
 
 		wgResults.Add(1)
 		atomic.AddInt64(&stats.Calls, 1)
-		_, err := cli.Call(stats.URI, stats.Payload, stats.Timeout)
+		_, err := cli.Call(getURI(stats), stats.Payload, stats.Timeout)
 		if err != nil {
 			log.Fatalf("Call failed: %v", err)
 		}
