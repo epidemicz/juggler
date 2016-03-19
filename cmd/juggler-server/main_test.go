@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/PuerkitoBio/juggler"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -71,7 +72,7 @@ redis:
     addr: localhost:1234
 `, &Config{
 				Redis:        &Redis{Addr: "localhost:1234"},
-				Server:       &Server{Addr: ":9000", Paths: []string{"/ws"}},
+				Server:       &Server{Addr: ":9000", Paths: []string{"/ws"}, SlowProcessMsgThreshold: juggler.SlowProcessMsgThreshold},
 				CallerBroker: &CallerBroker{},
 			},
 		},
@@ -95,7 +96,7 @@ redis:
 						MaxActive: 123,
 					},
 				},
-				Server:       &Server{Addr: ":9000", Paths: []string{"/ws"}},
+				Server:       &Server{Addr: ":9000", Paths: []string{"/ws"}, SlowProcessMsgThreshold: juggler.SlowProcessMsgThreshold},
 				CallerBroker: &CallerBroker{},
 			},
 		},
@@ -138,7 +139,7 @@ server:
 				Server: &Server{Addr: ":9876", Paths: []string{"/ws", "/"}, MaxHeaderBytes: 23, ReadBufferSize: 4,
 					WriteBufferSize: 5, HandshakeTimeout: time.Minute, WhitelistedOrigins: []string{"http://localhost:4444"},
 					ReadLimit: 6, WriteLimit: 7, ReadTimeout: time.Hour, WriteTimeout: 2 * time.Hour,
-					AcquireWriteLockTimeout: 3 * time.Hour, AllowEmptySubprotocol: true},
+					AcquireWriteLockTimeout: 3 * time.Hour, AllowEmptySubprotocol: true, SlowProcessMsgThreshold: juggler.SlowProcessMsgThreshold},
 				CallerBroker: &CallerBroker{BlockingTimeout: 2 * time.Second, CallCap: 987},
 			},
 		},
