@@ -32,7 +32,7 @@ var (
 	durationFlag    = flag.Duration("d", 10*time.Second, "Run `duration`.")
 	delayFlag       = flag.Duration("delay", 0, "Start execution after `delay`.")
 	helpFlag        = flag.Bool("help", false, "Show help.")
-	numURIsFlag     = flag.Int("n", 1, "Spread calls to this `number` of URIs (added as a suffix to the URI).")
+	numURIsFlag     = flag.Int("n", 0, "Spread calls to this `number` of URIs (added as a suffix to the URI).")
 	payloadFlag     = flag.String("p", "100", "Call `payload`.")
 	subprotoFlag    = flag.String("proto", "juggler.0", "Websocket `subprotocol`.")
 	callRateFlag    = flag.Duration("r", 100*time.Millisecond, "Call `rate` per connection.")
@@ -61,7 +61,7 @@ Rate:        {{ .Run.Rate | printf "%s" }}
 Timeout:     {{ .Run.Timeout | printf "%s" }}
 Duration:    {{ .Run.Duration | printf "%s" }}
 
---- STATISTICS
+--- CLIENT STATISTICS
 
 Actual Duration: {{ .Run.ActualDuration | printf "%s" }}
 Calls:           {{ .Run.Calls }}

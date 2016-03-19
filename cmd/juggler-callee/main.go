@@ -26,14 +26,14 @@ import (
 
 var (
 	brokerBlockingTimeoutFlag = flag.Duration("broker-blocking-timeout", 0, "Blocking `timeout` when polling for call requests.")
-	brokerResultCapFlag       = flag.Int("broker-result-cap", 100, "Capacity of the `results` queue.")
+	brokerResultCapFlag       = flag.Int("broker-result-cap", 0, "Capacity of the `results` queue.")
 	helpFlag                  = flag.Bool("help", false, "Show help.")
-	numDelayURIsFlag          = flag.Int("n", 100, "Number of test.delay `URIs`.")
+	numDelayURIsFlag          = flag.Int("n", 0, "Number of test.delay `URIs`.")
 	redisAddrFlag             = flag.String("redis", ":6379", "Redis `address`.")
 	httpServerPortFlag        = flag.Int("port", 9001, "HTTP server `port` to serve debug endpoints.")
-	redisPoolIdleTimeoutFlag  = flag.Duration("redis-idle-timeout", time.Minute, "Redis idle connection `timeout`.")
-	redisPoolMaxActiveFlag    = flag.Int("redis-max-active", 100, "Maximum active redis `connections`.")
-	redisPoolMaxIdleFlag      = flag.Int("redis-max-idle", 10, "Maximum idle redis `connections`.")
+	redisPoolIdleTimeoutFlag  = flag.Duration("redis-idle-timeout", 0, "Redis idle connection `timeout`.")
+	redisPoolMaxActiveFlag    = flag.Int("redis-max-active", 0, "Maximum active redis `connections`.")
+	redisPoolMaxIdleFlag      = flag.Int("redis-max-idle", 0, "Maximum idle redis `connections`.")
 	workersFlag               = flag.Int("workers", 1, "Number of concurrent `workers` processing call requests.")
 )
 
