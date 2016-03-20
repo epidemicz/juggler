@@ -87,12 +87,16 @@ func (c *resultsConn) Results() <-chan *msg.ResPayload {
 				k := fmt.Sprintf(resTimeoutKey, rp.ConnUUID, rp.MsgUUID)
 				pttl, err := redis.Int(delAndPTTLScript.Do(c.c, k))
 				if err != nil {
-					c.vars.Add("FailedPTTLResults", 1)
+					if c.vars != nil {
+						c.vars.Add("FailedPTTLResults", 1)
+					}
 					logf(c.logFn, "Results: DEL/PTTL failed: %v", err)
 					continue
 				}
 				if pttl <= 0 {
-					c.vars.Add("ExpiredResults", 1)
+					if c.vars != nil {
+						c.vars.Add("ExpiredResults", 1)
+					}
 					logf(c.logFn, "Results: message %v expired, dropping call", rp.MsgUUID)
 					continue
 				}

@@ -98,12 +98,16 @@ func (c *callsConn) Calls() <-chan *msg.CallPayload {
 				k := fmt.Sprintf(callTimeoutKey, cp.URI, cp.MsgUUID)
 				pttl, err := redis.Int(delAndPTTLScript.Do(c.c, k))
 				if err != nil {
-					c.vars.Add("FailedPTTLCalls", 1)
+					if c.vars != nil {
+						c.vars.Add("FailedPTTLCalls", 1)
+					}
 					logf(c.logFn, "Calls: DEL/PTTL failed: %v", err)
 					continue
 				}
 				if pttl <= 0 {
-					c.vars.Add("ExpiredCalls", 1)
+					if c.vars != nil {
+						c.vars.Add("ExpiredCalls", 1)
+					}
 					logf(c.logFn, "Calls: message %v expired, dropping call", cp.MsgUUID)
 					continue
 				}
