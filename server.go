@@ -50,7 +50,7 @@ type Server struct {
 
 	// WriteLimit defines the maximum size, in bytes, of outgoing
 	// messages. If a message exceeds this limit, it is dropped and
-	// an ERR message is sent to the client instead. The default of 0
+	// a NACK message is sent to the client instead. The default of 0
 	// means no limit.
 	WriteLimit int64
 

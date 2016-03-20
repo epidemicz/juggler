@@ -11,7 +11,7 @@ There are many different authentication mechanisms, each with its own advantages
 
 Then for URIs that require authentication, the middleware `Handler` can check for a valid token (exists and is not expired), and either proceed with the authenticated call or return:
 
-* ERR {"code": 403, "message": "user is not authenticated"}
+* NACK {"code": 403, "message": "user is not authenticated"}
 
 A downside is that it makes it harder to connect different juggler clients and servers, since authentication is implementation/application-specific. This is ok given the goal of juggler, which is to build web applications, not for interoperability between heterogeneous systems.
 
@@ -36,7 +36,7 @@ In order to keep the juggler core small and focused, this feature is not provide
 
 * when a callee starts listening to a URI, it creates a key for that URI, with an expiration (e.g. SET "callee.uri.{uri}" 1 PX 30000).
 * the callee starts a goroutine that resets the TTL of the key at a regular interval (less than the key's TTL) as long as it is still listening for that URI (a heartbeat).
-* a middleware handler on the server intercepts the CALL messages and checks if the key for that URI exists, returning an ERR if it doesn't.
+* a middleware handler on the server intercepts the CALL messages and checks if the key for that URI exists, returning a NACK if it doesn't.
 * a meta-callee listens for a discovery URI (e.g. com.example.ListURIs) and queries the existing keys (e.g. using SCAN), returning the live URIs.
 
 In the worst case, an inactive URI would be reported as "live" for the TTL of the key (if the callee dies just after having set the expiration of the key). Multiple callees can listen for the same URI without problem, and it would stop being reported as "live" only when the last callee stops listening. The dynamic discovery is somewhat more complex in a redis-cluster (it would require a SCAN on each node, see https://github.com/antirez/redis-doc/issues/286).
