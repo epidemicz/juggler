@@ -80,7 +80,7 @@ type Server struct {
 	// LogFunc is the function called to log events. By default,
 	// it logs using log.Printf. Logging can be disabled by setting
 	// LogFunc to DiscardLog.
-	LogFunc func(string, ...interface{}) // TODO : normalize calls so that order of args is somewhat predictable
+	LogFunc func(string, ...interface{})
 
 	// PubSubBroker is the broker to use for pub-sub messages. It must be
 	// set before the Server can be used.
@@ -132,7 +132,7 @@ func (srv *Server) ServeConn(conn *websocket.Conn) {
 		cs(c, Connected)
 	}
 
-	// receive, results loop, pub/sub loop
+	// receive, results, pub/sub loops
 	go c.pubSub()
 	go c.results()
 	go c.receive()

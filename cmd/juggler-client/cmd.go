@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
-	"net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -88,12 +87,13 @@ var connectCmd = &cmd{
 			addr = args[0]
 		}
 
-		head := http.Header{"Sec-WebSocket-Protocol": {*defaultSubprotoFlag}}
+		subs := []string{*defaultSubprotoFlag}
 		if len(args) > 1 {
-			head.Set("Sec-WebSocket-Protocol", args[1])
+			subs[0] = args[1]
 		}
+		d.Subprotocols = subs
 
-		conn, err := client.Dial(&d, addr, head,
+		conn, err := client.Dial(&d, addr, nil,
 			client.SetHandler(connMsgLogger(len(connections)+1)),
 			client.SetLogFunc(printErr))
 		if err != nil {
@@ -105,6 +105,8 @@ var connectCmd = &cmd{
 		printf("[%d] connected to %s", len(connections), addr)
 	},
 }
+
+// TODO : log raw messages if -raw is set, somehow...?
 
 type connMsgLogger int
 

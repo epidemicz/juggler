@@ -1,6 +1,7 @@
 package juggler_test
 
 import (
+	"expvar"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -49,7 +50,8 @@ func TestServerServe(t *testing.T) {
 			assert.Fail(t, "could not sent state %d", cs)
 		}
 	}
-	server := &juggler.Server{ConnState: fn, CallerBroker: broker, PubSubBroker: broker, LogFunc: dbgl.Printf}
+	vars := expvar.NewMap("test")
+	server := &juggler.Server{ConnState: fn, CallerBroker: broker, PubSubBroker: broker, LogFunc: dbgl.Printf, Vars: vars}
 
 	go server.ServeConn(conn)
 

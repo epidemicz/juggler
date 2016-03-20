@@ -26,6 +26,7 @@ var (
 var (
 	defaultConnFlag     = flag.String("addr", "ws://localhost:9000/ws", "Default server `address` used in connect command.")
 	defaultSubprotoFlag = flag.String("proto", "juggler.0", "Default `subprotocol` used in connect command.")
+	rawFlag             = flag.Bool("raw", false, "Log raw messages.")
 	timestampFmtFlag    = flag.String("timestamp", time.StampMilli, "Timestamp `format`, using Go time format syntax.")
 	helpFlag            = flag.Bool("help", false, "Show help.")
 )
