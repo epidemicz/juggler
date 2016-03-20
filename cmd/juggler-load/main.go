@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -49,6 +50,7 @@ var (
 		"subf": subfFn,
 		"avg":  avgFn,
 		"med":  medFn,
+		"pctl": pctlFn,
 	}
 
 	tpl = template.Must(template.New("output").Funcs(fnMap).Parse(`
@@ -75,8 +77,11 @@ Expired:         {{ .Run.Exp }}
 
 --- CLIENT LATENCIES
 
-Average: {{ avg .Latencies }}
-Median:  {{ med .Latencies }}
+Average:         {{ avg .Latencies }}
+Median:          {{ med .Latencies }}
+50th Percentile: {{ pctl 50 .Latencies }}
+90th Percentile: {{ pctl 90 .Latencies }}
+99th Percentile: {{ pctl 99 .Latencies }}
 
 --- SERVER STATISTICS
 
@@ -160,6 +165,36 @@ func medFn(durs []time.Duration) time.Duration {
 		v /= 2
 	}
 	return v
+}
+
+// from https://github.com/golang/go/issues/4594#issuecomment-135336012
+func round(f float64) int {
+	if math.Abs(f) < 0.5 {
+		return 0
+	}
+	return int(f + math.Copysign(0.5, f))
+}
+
+func pctlFn(n int, durs []time.Duration) time.Duration {
+	if len(durs) == 0 {
+		return 0
+	}
+	if len(durs) == 1 {
+		return durs[0]
+	}
+
+	sort.Sort(durations(durs))
+	v := (float64(n) / 100.0) * float64(len(durs))
+	ix := int(v)
+	if v-float64(int(v)) != 0 {
+		if ix = round(v); ix > 0 {
+			ix--
+		}
+
+		return durs[ix]
+	}
+	sum := durs[ix] + durs[ix-1]
+	return sum / 2
 }
 
 // Copied from effective Go : https://golang.org/doc/effective_go.html#constants
