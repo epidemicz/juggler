@@ -27,6 +27,10 @@ func TestPctlFn(t *testing.T) {
 		{[]time.Duration{time.Second, 2 * time.Second, 3 * time.Second, 4 * time.Second}, 50, 2500 * time.Millisecond},
 		{[]time.Duration{time.Second, 2 * time.Second, 3 * time.Second, 4 * time.Second}, 90, 4 * time.Second},
 		{[]time.Duration{time.Second, 2 * time.Second, 3 * time.Second, 4 * time.Second}, 99, 4 * time.Second},
+		{[]time.Duration{time.Second, 2 * time.Second, 3 * time.Second, 4 * time.Second}, 0, time.Second},
+		{[]time.Duration{time.Second, 2 * time.Second, 3 * time.Second, 4 * time.Second}, 100, 4 * time.Second},
+		{[]time.Duration{time.Second, 2 * time.Second, 3 * time.Second, 4 * time.Second, 5 * time.Second}, 0, time.Second},
+		{[]time.Duration{time.Second, 2 * time.Second, 3 * time.Second, 4 * time.Second, 5 * time.Second}, 100, 5 * time.Second},
 	}
 
 	for i, c := range cases {

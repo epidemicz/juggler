@@ -76,6 +76,8 @@ Expired:         {{ .Run.Exp }}
 
 --- CLIENT LATENCIES
 
+Minimum:         {{ pctl 0 .Latencies }}
+Maximum:         {{ pctl 100 .Latencies }}
 Average:         {{ avg .Latencies }}
 Median:          {{ pctl 50 .Latencies }}
 75th Percentile: {{ pctl 75 .Latencies }}
@@ -168,6 +170,7 @@ func pctlFn(n int, durs []time.Duration) time.Duration {
 	}
 
 	sort.Sort(durations(durs))
+
 	v := (float64(n) / 100.0) * float64(len(durs))
 	ix := int(v)
 	if v-float64(int(v)) != 0 {
@@ -177,6 +180,15 @@ func pctlFn(n int, durs []time.Duration) time.Duration {
 
 		return durs[ix]
 	}
+
+	// edge cases
+	if ix == 0 {
+		return durs[0]
+	}
+	if ix == len(durs) {
+		return durs[len(durs)-1]
+	}
+
 	sum := durs[ix] + durs[ix-1]
 	return sum / 2
 }
