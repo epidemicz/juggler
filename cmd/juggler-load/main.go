@@ -79,7 +79,7 @@ Expired:         {{ .Run.Exp }}
 
 Average:         {{ avg .Latencies }}
 Median:          {{ med .Latencies }}
-50th Percentile: {{ pctl 50 .Latencies }}
+75th Percentile: {{ pctl 75 .Latencies }}
 90th Percentile: {{ pctl 90 .Latencies }}
 99th Percentile: {{ pctl 99 .Latencies }}
 
