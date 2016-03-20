@@ -25,6 +25,7 @@ type callsConn struct {
 	uris    []string
 	timeout time.Duration
 	logFn   func(string, ...interface{})
+	vars    *expvar.Map
 
 	// once makes sure only the first call to Calls starts the goroutine.
 	once sync.Once
@@ -35,8 +36,8 @@ type callsConn struct {
 	err   error
 }
 
-func newCallsConn(rc redis.Conn, uris []string, to time.Duration, logFn func(string, ...interface{})) *callsConn {
-	return &callsConn{c: rc, uris: uris, timeout: to, logFn: logFn}
+func newCallsConn(rc redis.Conn, uris []string, vars *expvar.Map, to time.Duration, logFn func(string, ...interface{})) *callsConn {
+	return &callsConn{c: rc, uris: uris, vars: vars, timeout: to, logFn: logFn}
 }
 
 // Close closes the connection.
@@ -51,11 +52,6 @@ func (c *callsConn) CallsErr() error {
 	c.errmu.Unlock()
 	return err
 }
-
-var (
-	pttlCallFailed = expvar.NewInt("CallPTTLFailed")
-	callExpired    = expvar.NewInt("CallExpired")
-)
 
 // Calls returns a stream of call requests for the URIs specified when
 // creating the callsConn.
@@ -102,12 +98,12 @@ func (c *callsConn) Calls() <-chan *msg.CallPayload {
 				k := fmt.Sprintf(callTimeoutKey, cp.URI, cp.MsgUUID)
 				pttl, err := redis.Int(delAndPTTLScript.Do(c.c, k))
 				if err != nil {
-					pttlCallFailed.Add(1)
+					c.vars.Add("FailedPTTLCalls", 1)
 					logf(c.logFn, "Calls: DEL/PTTL failed: %v", err)
 					continue
 				}
 				if pttl <= 0 {
-					callExpired.Add(1)
+					c.vars.Add("ExpiredCalls", 1)
 					logf(c.logFn, "Calls: message %v expired, dropping call", cp.MsgUUID)
 					continue
 				}

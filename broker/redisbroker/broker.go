@@ -16,6 +16,7 @@ package redisbroker
 
 import (
 	"encoding/json"
+	"expvar"
 	"fmt"
 	"log"
 	"time"
@@ -70,6 +71,11 @@ type Broker struct {
 	// If it is exceeded for a given connection, Broker.Result calls
 	// for that connection will fail with an error.
 	ResultCap int
+
+	// Vars can be set to an *expvar.Map to collect metrics about the
+	// broker. It should be set before starting to make calls with the
+	// broker.
+	Vars *expvar.Map
 }
 
 var callOrResScript = redis.NewScript(2, `
@@ -163,7 +169,7 @@ func (b *Broker) Calls(uris ...string) (broker.CallsConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newCallsConn(rc, uris, b.BlockingTimeout, b.LogFunc), nil
+	return newCallsConn(rc, uris, b.Vars, b.BlockingTimeout, b.LogFunc), nil
 }
 
 // Results returns a results connection that can be used to process the call
@@ -173,7 +179,7 @@ func (b *Broker) Results(connUUID uuid.UUID) (broker.ResultsConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newResultsConn(rc, connUUID, b.BlockingTimeout, b.LogFunc), nil
+	return newResultsConn(rc, connUUID, b.Vars, b.BlockingTimeout, b.LogFunc), nil
 }
 
 func logf(fn func(string, ...interface{}), f string, args ...interface{}) {

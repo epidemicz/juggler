@@ -19,6 +19,7 @@ type resultsConn struct {
 	connUUID uuid.UUID
 	timeout  time.Duration
 	logFn    func(string, ...interface{})
+	vars     *expvar.Map
 
 	// once makes sure only the first call to Results starts the goroutine.
 	once sync.Once
@@ -29,8 +30,8 @@ type resultsConn struct {
 	err   error
 }
 
-func newResultsConn(rc redis.Conn, connUUID uuid.UUID, to time.Duration, logFn func(string, ...interface{})) *resultsConn {
-	return &resultsConn{c: rc, connUUID: connUUID, timeout: to, logFn: logFn}
+func newResultsConn(rc redis.Conn, connUUID uuid.UUID, vars *expvar.Map, to time.Duration, logFn func(string, ...interface{})) *resultsConn {
+	return &resultsConn{c: rc, connUUID: connUUID, vars: vars, timeout: to, logFn: logFn}
 }
 
 // Close closes the connection.
@@ -45,11 +46,6 @@ func (c *resultsConn) ResultsErr() error {
 	c.errmu.Unlock()
 	return err
 }
-
-var (
-	pttlResFailed = expvar.NewInt("ResultPTTLFailed")
-	resExpired    = expvar.NewInt("ResultExpired")
-)
 
 // Results returns a stream of call results for the connUUID specified when
 // creating the resultsConn.
@@ -91,12 +87,12 @@ func (c *resultsConn) Results() <-chan *msg.ResPayload {
 				k := fmt.Sprintf(resTimeoutKey, rp.ConnUUID, rp.MsgUUID)
 				pttl, err := redis.Int(delAndPTTLScript.Do(c.c, k))
 				if err != nil {
-					pttlResFailed.Add(1)
+					c.vars.Add("FailedPTTLResults", 1)
 					logf(c.logFn, "Results: DEL/PTTL failed: %v", err)
 					continue
 				}
 				if pttl <= 0 {
-					resExpired.Add(1)
+					c.vars.Add("ExpiredResults", 1)
 					logf(c.logFn, "Results: message %v expired, dropping call", rp.MsgUUID)
 					continue
 				}
