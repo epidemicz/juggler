@@ -1,4 +1,4 @@
-package msg
+package message
 
 import (
 	"bytes"
@@ -38,8 +38,8 @@ func TestMarshalUnmarshal(t *testing.T) {
 		NewSub("b", false),
 		NewUnsb("c", true),
 		pub,
-		NewErr(call, 500, io.EOF),
-		NewOK(pub),
+		NewNack(call, 500, io.EOF),
+		NewAck(pub),
 		NewRes(rp),
 		NewEvnt(ep),
 	}
@@ -50,9 +50,9 @@ func TestMarshalUnmarshal(t *testing.T) {
 		mm, err := Unmarshal(bytes.NewReader(b))
 		require.NoError(t, err, "Unmarshal %d", i)
 
-		// for ErrMsg, the Err is not marshaled, so zero it before the comparison
-		if m.Type() == ErrMsg {
-			m.(*Err).Payload.Err = nil
+		// for NackMsg, the Nack is not marshaled, so zero it before the comparison
+		if m.Type() == NackMsg {
+			m.(*Nack).Payload.Err = nil
 		}
 
 		assert.True(t, reflect.DeepEqual(m, mm), "DeepEqual %d", i)
@@ -65,17 +65,17 @@ func TestMarshalUnmarshal(t *testing.T) {
 	}
 }
 
-func TestNewErrFromOK(t *testing.T) {
+func TestNewNackFromAck(t *testing.T) {
 	t.Parallel()
 
 	pub, err := NewPub("d", map[string]interface{}{"y": "ok"})
 	require.NoError(t, err, "NewPub")
-	ok := NewOK(pub)
-	e := NewErr(ok, 500, io.EOF)
+	ack := NewAck(pub)
+	nack := NewNack(ack, 500, io.EOF)
 
-	// should keep the "from" information of OK
-	assert.Equal(t, e.Payload.For, ok.Payload.For, "For")
-	assert.Equal(t, e.Payload.ForType, ok.Payload.ForType, "ForType")
-	assert.Equal(t, e.Payload.URI, ok.Payload.URI, "URI")
-	assert.Equal(t, e.Payload.Channel, ok.Payload.Channel, "Channel")
+	// should keep the "from" information of Ack
+	assert.Equal(t, nack.Payload.For, ack.Payload.For, "For")
+	assert.Equal(t, nack.Payload.ForType, ack.Payload.ForType, "ForType")
+	assert.Equal(t, nack.Payload.URI, ack.Payload.URI, "URI")
+	assert.Equal(t, nack.Payload.Channel, ack.Payload.Channel, "Channel")
 }

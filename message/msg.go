@@ -1,4 +1,4 @@
-// Package msg defines the supported types of messages in the juggler
+// Package message defines the supported types of messages in the juggler
 // protocol.
 //
 // The juggler.0 protocol defines the following messages for the client:
@@ -10,20 +10,17 @@
 //
 // And the following messages for the server:
 //
-//     - ERR  : failed CALL, SUB, UNSB or PUB
-//     - OK   : successful CALL (but no result yet), SUB, UNSB or PUB
+//     - ACK  : successful CALL (but no result yet), SUB, UNSB or PUB
+//     - NACK : failed CALL, SUB, UNSB or PUB
 //     - RES  : the result of a CALL message
 //     - EVNT : an event triggered on a channel that the client is subscribed to
-//
-// Closing the communication is done via the standard websocket close
-// process.
 //
 // All messages must be of type websocket.TextMessage. Failing to properly
 // speak the protocol terminates the connection without notice from the
 // peer. That includes sending binary messages and sending unknown (or
 // invalid for the peer) message types.
 //
-package msg
+package message
 
 import (
 	"encoding/json"
@@ -34,12 +31,12 @@ import (
 	"github.com/pborman/uuid"
 )
 
-// MessageType indicates the type of a message.
-type MessageType int
+// Type indicates the type of a message.
+type Type int
 
 // The list of supported message types.
 const (
-	startRead MessageType = iota
+	startRead Type = iota
 	CallMsg
 	PubMsg
 	SubMsg
@@ -47,33 +44,33 @@ const (
 	endRead
 
 	startWrite
-	ErrMsg
-	OKMsg
+	NackMsg
+	AckMsg
 	ResMsg
 	EvntMsg
 	endWrite
 
 	// customMsg allows for definition of custom message types,
 	// starting at ID 256 (first 255 are reserved).
-	customMsg MessageType = 256
+	customMsg Type = 256
 )
 
 var nextCustomMsg = customMsg
 
-var lookupMessageType = map[MessageType]string{
+var lookupType = map[Type]string{
 	CallMsg: "CALL",
 	PubMsg:  "PUB",
 	SubMsg:  "SUB",
 	UnsbMsg: "UNSB",
-	ErrMsg:  "ERR",
-	OKMsg:   "OK",
+	NackMsg: "NACK",
+	AckMsg:  "ACK",
 	ResMsg:  "RES",
 	EvntMsg: "EVNT",
 }
 
-// RegisterCustomMsg registers a new custom message having the
-// provided name for its string representation (typically 2-4 letters,
-// in uppercase). It returns the MessageType of that message.
+// Register registers a new custom message having the
+// provided name for its string representation (typically 2-4
+// letters, in uppercase). It returns the Type of that message.
 //
 // Custom messages may not be unmarshaled and should not be
 // sent over the network to any peer - only the predefined
@@ -83,27 +80,27 @@ var lookupMessageType = map[MessageType]string{
 // client itself when a CALL has expired and no result will
 // be returned.
 //
-// RegisterCustomMsg should be called in the init function of
-// the package that needs the message, to guarantee all custom
+// Register should be called in the init function of the
+// package that needs the message, to guarantee all custom
 // messages are registered before use. It panics if a message
 // by that name has already been registered.
-func RegisterCustomMsg(name string) MessageType {
-	for _, v := range lookupMessageType {
+func Register(name string) Type {
+	for _, v := range lookupType {
 		if v == name {
-			panic("RegisterCustomMsg called twice for " + name)
+			panic("Register called twice for " + name)
 		}
 	}
 
 	mt := nextCustomMsg
 	nextCustomMsg++
-	lookupMessageType[mt] = name
+	lookupType[mt] = name
 	return mt
 }
 
 // String returns the human-readable representation of message types.
-func (mt MessageType) String() string {
-	if s := lookupMessageType[mt]; s != "" {
-		return lookupMessageType[mt]
+func (mt Type) String() string {
+	if s := lookupType[mt]; s != "" {
+		return lookupType[mt]
 	}
 	return fmt.Sprintf("<unknown: %d>", mt)
 }
@@ -111,27 +108,27 @@ func (mt MessageType) String() string {
 // IsRead returns true if the message type is a "read" from the
 // point of view of the server (that is, if this is a message
 // that was sent by a client).
-func (mt MessageType) IsRead() bool {
+func (mt Type) IsRead() bool {
 	return startRead < mt && mt < endRead
 }
 
 // IsWrite returns true if the message type is a "write" from the
 // point of view of the server (that is, if this is a message
 // that is being sent by the server).
-func (mt MessageType) IsWrite() bool {
+func (mt Type) IsWrite() bool {
 	return startWrite < mt && mt < endWrite
 }
 
 // IsStd returns true if the message is a standard juggler message
 // (not a custom or unknown one).
-func (mt MessageType) IsStd() bool {
+func (mt Type) IsStd() bool {
 	return mt.IsRead() || mt.IsWrite()
 }
 
 // Msg defines the common methods implemented by all messages.
 type Msg interface {
 	// Type returns the message type.
-	Type() MessageType
+	Type() Type
 
 	// UUID is the unique identifier of the message.
 	UUID() uuid.UUID
@@ -139,12 +136,12 @@ type Msg interface {
 
 // Meta contains the metadata for a message.
 type Meta struct {
-	T MessageType `json:"type"`
-	U uuid.UUID   `json:"uuid"`
+	T Type      `json:"type"`
+	U uuid.UUID `json:"uuid"`
 }
 
 // NewMeta returns a new, initialized Meta.
-func NewMeta(t MessageType) Meta {
+func NewMeta(t Type) Meta {
 	return Meta{T: t, U: uuid.NewRandom()}
 }
 
@@ -156,7 +153,7 @@ type partialMsg struct {
 }
 
 // Type returns the message type.
-func (m Meta) Type() MessageType {
+func (m Meta) Type() Type {
 	return m.T
 }
 
@@ -266,105 +263,107 @@ func NewPub(channel string, args interface{}) (*Pub, error) {
 	return p, nil
 }
 
-// Err is an error message. It indicates the source message that
-// failed to be delivered in the For (and ForType) fields. An Err
-// is sent only when something failed to execute properly - notably,
-// it is not sent if the result of a call was processed by the callee
-// but resulted in an error. This would be returned by a Res message.
-type Err struct {
+// Nack is an negative-acknowledge message. It indicates the source
+// message that failed to be delivered in the For (and ForType)
+// fields. A Nack is sent only when a Pub-Sub or RPC request failed
+// to be processed properly - notably, it is not sent if the result
+// of a call was processed by the callee but resulted in an error.
+// This would be returned by a Res message.
+type Nack struct {
 	Meta    `json:"meta"`
 	Payload struct {
-		For     uuid.UUID   `json:"for"`
-		ForType MessageType `json:"for_type"`
-		URI     string      `json:"uri,omitempty"`     // when in response to a CALL
-		Channel string      `json:"channel,omitempty"` // when in response to a PUB, SUB or UNSB
-		Code    int         `json:"code"`
-		Message string      `json:"message"` // defaults to Err.Error()
-		Err     error       `json:"-"`       // useful in the handler to have access to the source error
+		For     uuid.UUID `json:"for"`
+		ForType Type      `json:"for_type"`
+		URI     string    `json:"uri,omitempty"`     // when in response to a CALL
+		Channel string    `json:"channel,omitempty"` // when in response to a PUB, SUB or UNSB
+		Code    int       `json:"code"`
+		Message string    `json:"message"` // defaults to Err.Error()
+		Err     error     `json:"-"`       // useful in the handler to have access to the source error, but not sent to the peer
 	} `json:"payload"`
 }
 
-// NewErr creates a new Err message to notify a failure to process
+// NewNack creates a new Nack message to notify a failure to process
 // the from message.
-func NewErr(from Msg, code int, e error) *Err {
-	err := &Err{
-		Meta: NewMeta(ErrMsg),
+func NewNack(from Msg, code int, e error) *Nack {
+	nack := &Nack{
+		Meta: NewMeta(NackMsg),
 	}
-	err.Payload.For = from.UUID()
-	err.Payload.ForType = from.Type()
-	err.Payload.Code = code
-	err.Payload.Err = e
-	err.Payload.Message = e.Error()
+	nack.Payload.For = from.UUID()
+	nack.Payload.ForType = from.Type()
+	nack.Payload.Code = code
+	nack.Payload.Err = e
+	nack.Payload.Message = e.Error()
 
 	switch from := from.(type) {
 	case *Call:
-		err.Payload.URI = from.Payload.URI
+		nack.Payload.URI = from.Payload.URI
 	case *Pub:
-		err.Payload.Channel = from.Payload.Channel
+		nack.Payload.Channel = from.Payload.Channel
 	case *Sub:
-		err.Payload.Channel = from.Payload.Channel
+		nack.Payload.Channel = from.Payload.Channel
 	case *Unsb:
-		err.Payload.Channel = from.Payload.Channel
+		nack.Payload.Channel = from.Payload.Channel
 
 		// other cases can happen e.g. if the message is too large
 		// instead of sending the "from" info from the never-sent
-		// OK, Err, Evnt or Res message, send back the origin "from"
+		// Ack, Nack, Evnt or Res message, send back the original "from"
 		// information.
-	case *OK:
-		err.Payload.For = from.Payload.For
-		err.Payload.ForType = from.Payload.ForType
-		err.Payload.URI = from.Payload.URI
-		err.Payload.Channel = from.Payload.Channel
-	case *Err:
-		err.Payload.For = from.Payload.For
-		err.Payload.ForType = from.Payload.ForType
-		err.Payload.URI = from.Payload.URI
-		err.Payload.Channel = from.Payload.Channel
+	case *Ack:
+		nack.Payload.For = from.Payload.For
+		nack.Payload.ForType = from.Payload.ForType
+		nack.Payload.URI = from.Payload.URI
+		nack.Payload.Channel = from.Payload.Channel
+	case *Nack:
+		nack.Payload.For = from.Payload.For
+		nack.Payload.ForType = from.Payload.ForType
+		nack.Payload.URI = from.Payload.URI
+		nack.Payload.Channel = from.Payload.Channel
 	case *Evnt:
-		err.Payload.For = from.Payload.For
-		err.Payload.ForType = PubMsg
-		err.Payload.Channel = from.Payload.Channel
+		nack.Payload.For = from.Payload.For
+		nack.Payload.ForType = PubMsg
+		nack.Payload.Channel = from.Payload.Channel
 	case *Res:
-		err.Payload.For = from.Payload.For
-		err.Payload.ForType = CallMsg
-		err.Payload.URI = from.Payload.URI
+		nack.Payload.For = from.Payload.For
+		nack.Payload.ForType = CallMsg
+		nack.Payload.URI = from.Payload.URI
 	}
-	return err
+	return nack
 }
 
-// OK is a success message, when the request of the caller was successfully
-// registered. It doesn't mean that e.g. a CALL has succeeded - only that
-// the CALL was properly registered for a callee to process, eventually.
-type OK struct {
+// Ack is a successful acknowledge message, meaning the request of the
+// caller was successfully registered. It doesn't mean that e.g. a CALL
+// has succeeded - only that the CALL was properly registered for a
+// callee to process, eventually.
+type Ack struct {
 	Meta    `json:"meta"`
 	Payload struct {
-		For     uuid.UUID   `json:"for"`
-		ForType MessageType `json:"for_type"`
-		URI     string      `json:"uri,omitempty"`     // when in response to a CALL
-		Channel string      `json:"channel,omitempty"` // when in response to a PUB, SUB or UNSB
+		For     uuid.UUID `json:"for"`
+		ForType Type      `json:"for_type"`
+		URI     string    `json:"uri,omitempty"`     // when in response to a CALL
+		Channel string    `json:"channel,omitempty"` // when in response to a PUB, SUB or UNSB
 	} `json:"payload"`
 }
 
-// NewOK creates a new OK message to notify the successful execution
+// NewAck creates a new Ack message to notify the successful processing
 // of the from message.
-func NewOK(from Msg) *OK {
-	ok := &OK{
-		Meta: NewMeta(OKMsg),
+func NewAck(from Msg) *Ack {
+	ack := &Ack{
+		Meta: NewMeta(AckMsg),
 	}
-	ok.Payload.For = from.UUID()
-	ok.Payload.ForType = from.Type()
+	ack.Payload.For = from.UUID()
+	ack.Payload.ForType = from.Type()
 
 	switch from := from.(type) {
 	case *Call:
-		ok.Payload.URI = from.Payload.URI
+		ack.Payload.URI = from.Payload.URI
 	case *Pub:
-		ok.Payload.Channel = from.Payload.Channel
+		ack.Payload.Channel = from.Payload.Channel
 	case *Sub:
-		ok.Payload.Channel = from.Payload.Channel
+		ack.Payload.Channel = from.Payload.Channel
 	case *Unsb:
-		ok.Payload.Channel = from.Payload.Channel
+		ack.Payload.Channel = from.Payload.Channel
 	}
-	return ok
+	return ack
 }
 
 // Res is a result message. It returns the result of the invocation
@@ -439,7 +438,7 @@ func UnmarshalRequest(r io.Reader) (Msg, error) {
 // correct concrete message type. It returns an error if the message
 // type is invalid for a response (client <- server).
 func UnmarshalResponse(r io.Reader) (Msg, error) {
-	return unmarshalIf(r, ErrMsg, OKMsg, EvntMsg, ResMsg)
+	return unmarshalIf(r, NackMsg, AckMsg, EvntMsg, ResMsg)
 }
 
 // Unmarshal unmarshals a JSON-encoded message from r into the correct
@@ -448,7 +447,7 @@ func Unmarshal(r io.Reader) (Msg, error) {
 	return unmarshalIf(r)
 }
 
-func isIn(list []MessageType, v MessageType) bool {
+func isIn(list []Type, v Type) bool {
 	for _, vv := range list {
 		if v == vv {
 			return true
@@ -457,7 +456,7 @@ func isIn(list []MessageType, v MessageType) bool {
 	return false
 }
 
-func unmarshalIf(r io.Reader, allowed ...MessageType) (Msg, error) {
+func unmarshalIf(r io.Reader, allowed ...Type) (Msg, error) {
 	var pm partialMsg
 	if err := json.NewDecoder(r).Decode(&pm); err != nil {
 		return nil, fmt.Errorf("invalid JSON message: %v", err)
@@ -509,19 +508,19 @@ func unmarshalIf(r io.Reader, allowed ...MessageType) (Msg, error) {
 		}
 		m = &pub
 
-	case ErrMsg:
-		var e Err
-		if err := genericUnmarshal(&e, &e.Meta); err != nil {
+	case NackMsg:
+		var nack Nack
+		if err := genericUnmarshal(&nack, &nack.Meta); err != nil {
 			return nil, err
 		}
-		m = &e
+		m = &nack
 
-	case OKMsg:
-		var ok OK
-		if err := genericUnmarshal(&ok, &ok.Meta); err != nil {
+	case AckMsg:
+		var ack Ack
+		if err := genericUnmarshal(&ack, &ack.Meta); err != nil {
 			return nil, err
 		}
-		m = &ok
+		m = &ack
 
 	case ResMsg:
 		var res Res
