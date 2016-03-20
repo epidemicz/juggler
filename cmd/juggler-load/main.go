@@ -49,7 +49,6 @@ var (
 		"subd": subdFn,
 		"subf": subfFn,
 		"avg":  avgFn,
-		"med":  medFn,
 		"pctl": pctlFn,
 	}
 
@@ -78,7 +77,7 @@ Expired:         {{ .Run.Exp }}
 --- CLIENT LATENCIES
 
 Average:         {{ avg .Latencies }}
-Median:          {{ med .Latencies }}
+Median:          {{ pctl 50 .Latencies }}
 75th Percentile: {{ pctl 75 .Latencies }}
 90th Percentile: {{ pctl 90 .Latencies }}
 99th Percentile: {{ pctl 99 .Latencies }}
@@ -151,21 +150,6 @@ type durations []time.Duration
 func (d durations) Len() int           { return len(d) }
 func (d durations) Swap(x, y int)      { d[x], d[y] = d[y], d[x] }
 func (d durations) Less(x, y int) bool { return d[x] < d[y] }
-
-func medFn(durs []time.Duration) time.Duration {
-	if len(durs) == 0 {
-		return 0
-	}
-	sort.Sort(durations(durs))
-	ix := len(durs) / 2
-	v := durs[ix]
-	if len(durs)%2 == 0 {
-		// even, take the avg of ix and ix-1
-		v += durs[ix-1]
-		v /= 2
-	}
-	return v
-}
 
 // from https://github.com/golang/go/issues/4594#issuecomment-135336012
 func round(f float64) int {
