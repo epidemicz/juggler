@@ -6,7 +6,7 @@ package broker
 import (
 	"time"
 
-	"github.com/PuerkitoBio/juggler/msg"
+	"github.com/PuerkitoBio/juggler/message"
 	"github.com/pborman/uuid"
 )
 
@@ -24,7 +24,7 @@ type CallerBroker interface {
 	Results(uuid.UUID) (ResultsConn, error)
 
 	// Call registers a call request in the broker.
-	Call(cp *msg.CallPayload, timeout time.Duration) error
+	Call(cp *message.CallPayload, timeout time.Duration) error
 }
 
 // CalleeBroker defines the methods for a broker in the callee role.
@@ -34,7 +34,7 @@ type CalleeBroker interface {
 	Calls(uris ...string) (CallsConn, error)
 
 	// Result registers a call result in the broker.
-	Result(rp *msg.ResPayload, timeout time.Duration) error
+	Result(rp *message.ResPayload, timeout time.Duration) error
 }
 
 // PubSubBroker defines the methods for a broker in the pub-sub role.
@@ -45,7 +45,7 @@ type PubSubBroker interface {
 	PubSub() (PubSubConn, error)
 
 	// Publish publishes an event on the specified channel.
-	Publish(channel string, pp *msg.PubPayload) error
+	Publish(channel string, pp *message.PubPayload) error
 }
 
 // ResultsConn defines the methods to list the results from calls
@@ -59,7 +59,7 @@ type ResultsConn interface {
 	// Only the first call to Results starts the goroutine that checks
 	// for results. Subsequent calls return the same channel, so that many
 	// consumers can process results.
-	Results() <-chan *msg.ResPayload
+	Results() <-chan *message.ResPayload
 
 	// ResultsErr returns the error that caused the channel returned from
 	// Results to be closed. Is only non-nil once the channel is closed.
@@ -80,7 +80,7 @@ type CallsConn interface {
 	// Only the first call to Calls starts the goroutine that checks
 	// for requests. Subsequent calls return the same channel, so that many
 	// consumers can process calls.
-	Calls() <-chan *msg.CallPayload
+	Calls() <-chan *message.CallPayload
 
 	// CallsErr returns the error that caused the channel returned from
 	// Calls to be closed. Is only non-nil once the channel is closed.
@@ -110,7 +110,7 @@ type PubSubConn interface {
 	// Only the first call to Events starts the goroutine that listens to
 	// events. Subsequent calls return the same channel, so that many
 	// consumers can process events.
-	Events() <-chan *msg.EvntPayload
+	Events() <-chan *message.EvntPayload
 
 	// EventsErr returns the error that caused the channel returned from
 	// Events to be closed. Is only non-nil once the channel is closed.

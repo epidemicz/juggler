@@ -24,7 +24,7 @@ import (
 	"github.com/PuerkitoBio/juggler/client"
 	"github.com/PuerkitoBio/juggler/internal/jugglertest"
 	"github.com/PuerkitoBio/juggler/internal/redistest"
-	"github.com/PuerkitoBio/juggler/msg"
+	"github.com/PuerkitoBio/juggler/message"
 	"github.com/gorilla/websocket"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/assert"
@@ -136,8 +136,8 @@ type runStats struct {
 	Sub        int64
 	Unsb       int64
 	Exp        int64
-	OK         int64
-	Err        int64
+	Ack        int64
+	Nack       int64
 	Res        int64
 	Evnt       int64
 	Unknown    int64
@@ -151,8 +151,8 @@ func (s *runStats) clone() *runStats {
 		Sub:        atomic.LoadInt64(&s.Sub),
 		Unsb:       atomic.LoadInt64(&s.Unsb),
 		Exp:        atomic.LoadInt64(&s.Exp),
-		OK:         atomic.LoadInt64(&s.OK),
-		Err:        atomic.LoadInt64(&s.Err),
+		Ack:        atomic.LoadInt64(&s.Ack),
+		Nack:       atomic.LoadInt64(&s.Nack),
 		Res:        atomic.LoadInt64(&s.Res),
 		Evnt:       atomic.LoadInt64(&s.Evnt),
 		Unknown:    atomic.LoadInt64(&s.Unknown),
@@ -166,29 +166,29 @@ func TestIntegration(t *testing.T) {
 	runIntegrationTest(t, getIntgConfig())
 }
 
-func incStats(stats *runStats, m msg.Msg, fromSrv bool) {
+func incStats(stats *runStats, m message.Msg, fromSrv bool) {
 	switch m.Type() {
-	case msg.CallMsg:
+	case message.CallMsg:
 		atomic.AddInt64(&stats.Call, 1)
-	case msg.PubMsg:
+	case message.PubMsg:
 		if fromSrv {
 			atomic.AddInt64(&stats.PubSrvSent, 1)
 		} else {
 			atomic.AddInt64(&stats.PubCliSent, 1)
 		}
-	case msg.SubMsg:
+	case message.SubMsg:
 		atomic.AddInt64(&stats.Sub, 1)
-	case msg.UnsbMsg:
+	case message.UnsbMsg:
 		atomic.AddInt64(&stats.Unsb, 1)
 	case client.ExpMsg:
 		atomic.AddInt64(&stats.Exp, 1)
-	case msg.OKMsg:
-		atomic.AddInt64(&stats.OK, 1)
-	case msg.ErrMsg:
-		atomic.AddInt64(&stats.Err, 1)
-	case msg.ResMsg:
+	case message.AckMsg:
+		atomic.AddInt64(&stats.Ack, 1)
+	case message.NackMsg:
+		atomic.AddInt64(&stats.Nack, 1)
+	case message.ResMsg:
 		atomic.AddInt64(&stats.Res, 1)
-	case msg.EvntMsg:
+	case message.EvntMsg:
 		atomic.AddInt64(&stats.Evnt, 1)
 	default:
 		atomic.AddInt64(&stats.Unknown, 1)
@@ -197,7 +197,7 @@ func incStats(stats *runStats, m msg.Msg, fromSrv bool) {
 
 func serverHandler(t *testing.T, brk broker.PubSubBroker, rc *runConfig, stats *runStats) juggler.Handler {
 	var once sync.Once
-	return juggler.HandlerFunc(func(ctx context.Context, c *juggler.Conn, m msg.Msg) {
+	return juggler.HandlerFunc(func(ctx context.Context, c *juggler.Conn, m message.Msg) {
 		incStats(stats, m, m.Type().IsWrite())
 		juggler.ProcessMsg(ctx, c, m)
 
@@ -205,7 +205,7 @@ func serverHandler(t *testing.T, brk broker.PubSubBroker, rc *runConfig, stats *
 		once.Do(func() {
 			go func() {
 				for _, m := range rc.serverPubs {
-					err := brk.Publish(m.Payload.Channel, &msg.PubPayload{
+					err := brk.Publish(m.Payload.Channel, &message.PubPayload{
 						MsgUUID: uuid.NewRandom(),
 						Args:    m.Payload.Args,
 					})
@@ -218,7 +218,7 @@ func serverHandler(t *testing.T, brk broker.PubSubBroker, rc *runConfig, stats *
 }
 
 func clientHandler(stats *runStats) client.Handler {
-	return client.HandlerFunc(func(ctx context.Context, c *client.Client, m msg.Msg) {
+	return client.HandlerFunc(func(ctx context.Context, c *client.Client, m message.Msg) {
 		incStats(stats, m, false)
 	})
 }
@@ -228,8 +228,8 @@ type runConfig struct {
 
 	rnd           *rand.Rand
 	randSeed      int64
-	msgsPerClient [][]msg.Msg
-	serverPubs    []*msg.Pub
+	msgsPerClient [][]message.Msg
+	serverPubs    []*message.Pub
 	expectedExp   int
 
 	start, end time.Time
@@ -241,9 +241,9 @@ func prepareExec(t *testing.T, conf *IntgConfig) *runConfig {
 	rnd := rand.New(rand.NewSource(seed))
 
 	nCliMsgs := int(conf.Duration / conf.ClientMsgRate)
-	mpc := make([][]msg.Msg, conf.NClients)
+	mpc := make([][]message.Msg, conf.NClients)
 	for i := 0; i < conf.NClients; i++ {
-		mpc[i] = make([]msg.Msg, nCliMsgs)
+		mpc[i] = make([]message.Msg, nCliMsgs)
 		for j := 0; j < nCliMsgs; j++ {
 			m, expires := newClientMsg(t, conf, rnd)
 			mpc[i][j] = m
@@ -254,7 +254,7 @@ func prepareExec(t *testing.T, conf *IntgConfig) *runConfig {
 	}
 
 	nSrvMsgs := int(conf.Duration / conf.ServerPubRate)
-	sps := make([]*msg.Pub, nSrvMsgs)
+	sps := make([]*message.Pub, nSrvMsgs)
 	for i := 0; i < nSrvMsgs; i++ {
 		sps[i] = newServerMsg(t, conf, rnd)
 	}
@@ -269,17 +269,17 @@ func prepareExec(t *testing.T, conf *IntgConfig) *runConfig {
 	}
 }
 
-func newServerMsg(t *testing.T, conf *IntgConfig, rnd *rand.Rand) *msg.Pub {
+func newServerMsg(t *testing.T, conf *IntgConfig, rnd *rand.Rand) *message.Pub {
 	ch := strconv.Itoa(rnd.Intn(conf.NChannels))
-	pub, err := msg.NewPub(ch, "server event")
+	pub, err := message.NewPub(ch, "server event")
 	require.NoError(t, err, "NewPub failed")
 	return pub
 }
 
-func newClientMsg(t *testing.T, conf *IntgConfig, rnd *rand.Rand) (m msg.Msg, expires bool) {
-	mt := msg.MessageType(rnd.Intn(int(msg.UnsbMsg)) + 1)
+func newClientMsg(t *testing.T, conf *IntgConfig, rnd *rand.Rand) (m message.Msg, expires bool) {
+	mt := message.Type(rnd.Intn(int(message.UnsbMsg)) + 1)
 	switch mt {
-	case msg.CallMsg:
+	case message.CallMsg:
 		uri := strconv.Itoa(rnd.Intn(conf.NURIs))
 		exp := rnd.Intn(conf.CallExpireOdds)
 		to := 10 * conf.ThunkDelay
@@ -287,21 +287,21 @@ func newClientMsg(t *testing.T, conf *IntgConfig, rnd *rand.Rand) (m msg.Msg, ex
 			expires = true
 			to = time.Millisecond
 		}
-		call, err := msg.NewCall(uri, "client call", to)
+		call, err := message.NewCall(uri, "client call", to)
 		require.NoError(t, err, "NewCall failed")
 		m = call
 
-	case msg.SubMsg:
+	case message.SubMsg:
 		ch := strconv.Itoa(rnd.Intn(conf.NChannels))
-		m = msg.NewSub(ch, false)
+		m = message.NewSub(ch, false)
 
-	case msg.UnsbMsg:
+	case message.UnsbMsg:
 		ch := strconv.Itoa(rnd.Intn(conf.NChannels))
-		m = msg.NewUnsb(ch, false)
+		m = message.NewUnsb(ch, false)
 
-	case msg.PubMsg:
+	case message.PubMsg:
 		ch := strconv.Itoa(rnd.Intn(conf.NChannels))
-		pub, err := msg.NewPub(ch, "client pub")
+		pub, err := message.NewPub(ch, "client pub")
 		require.NoError(t, err, "NewPub failed")
 		m = pub
 	}
@@ -359,7 +359,7 @@ func runIntegrationTest(t *testing.T, conf *IntgConfig) {
 	defer httpsrv.Close()
 
 	uris := conf.URIs()
-	thunk := func(cp *msg.CallPayload) (interface{}, error) {
+	thunk := func(cp *message.CallPayload) (interface{}, error) {
 		time.Sleep(conf.ThunkDelay)
 		return "ok", nil
 	}
@@ -424,22 +424,22 @@ func runIntegrationTest(t *testing.T, conf *IntgConfig) {
 			for _, m := range rc.msgsPerClient[i] {
 				incStats(&clientStats, m, false)
 				switch m := m.(type) {
-				case *msg.Call:
+				case *message.Call:
 					_, err := cli.Call(m.Payload.URI, m.Payload.Args, m.Payload.Timeout)
 					if !assert.NoError(t, err, "Call") {
 						return
 					}
-				case *msg.Sub:
+				case *message.Sub:
 					_, err := cli.Sub(m.Payload.Channel, m.Payload.Pattern)
 					if !assert.NoError(t, err, "Sub") {
 						return
 					}
-				case *msg.Unsb:
+				case *message.Unsb:
 					_, err := cli.Unsb(m.Payload.Channel, m.Payload.Pattern)
 					if !assert.NoError(t, err, "Unsb") {
 						return
 					}
-				case *msg.Pub:
+				case *message.Pub:
 					_, err := cli.Pub(m.Payload.Channel, m.Payload.Args)
 					if !assert.NoError(t, err, "Pub") {
 						return
@@ -492,11 +492,11 @@ func checkAndPrintResults(t *testing.T, rc *runConfig, srv, cli *runStats) {
 	for _, mpc := range rc.msgsPerClient {
 		cntMsgs += len(mpc)
 	}
-	assert.Equal(t, cntMsgs, int(cli.OK), "OK (clients)")
-	assert.Equal(t, cntMsgs, int(srv.OK), "OK (server)")
+	assert.Equal(t, cntMsgs, int(cli.Ack), "Ack (clients)")
+	assert.Equal(t, cntMsgs, int(srv.Ack), "Ack (server)")
 
-	assert.Equal(t, 0, int(cli.Err), "Err (clients)")
-	assert.Equal(t, 0, int(srv.Err), "Err (server)")
+	assert.Equal(t, 0, int(cli.Nack), "Nack (clients)")
+	assert.Equal(t, 0, int(srv.Nack), "Nack (server)")
 	assert.Equal(t, cli.Evnt, srv.Evnt, "Evnt")
 
 	assert.Equal(t, 0, int(cli.Unknown), "Unknown (clients)")
@@ -532,8 +532,8 @@ func checkAndPrintResults(t *testing.T, rc *runConfig, srv, cli *runStats) {
 		fmt.Fprintf(w, "• Pub (from client)\t%d\t%d\n", srv.PubCliSent, cli.PubCliSent)
 		fmt.Fprintf(w, "• Exp\t%d\t%d\n", srv.Exp, cli.Exp)
 		fmt.Fprintf(w, "• Res\t%d\t%d\n", srv.Res, cli.Res)
-		fmt.Fprintf(w, "• OK\t%d\t%d\n", srv.OK, cli.OK)
-		fmt.Fprintf(w, "• Err\t%d\t%d\n", srv.Err, cli.Err)
+		fmt.Fprintf(w, "• Ack\t%d\t%d\n", srv.Ack, cli.Ack)
+		fmt.Fprintf(w, "• Nack\t%d\t%d\n", srv.Nack, cli.Nack)
 		fmt.Fprintf(w, "• Evnt\t%d\t%d\n", srv.Evnt, cli.Evnt)
 		fmt.Fprintf(w, "• Unknown\t%d\t%d\n", srv.Unknown, cli.Unknown)
 		w.Flush()

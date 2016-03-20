@@ -20,7 +20,7 @@ import (
 	"github.com/PuerkitoBio/juggler/broker"
 	"github.com/PuerkitoBio/juggler/broker/redisbroker"
 	"github.com/PuerkitoBio/juggler/callee"
-	"github.com/PuerkitoBio/juggler/msg"
+	"github.com/PuerkitoBio/juggler/message"
 	"github.com/garyburd/redigo/redis"
 )
 
@@ -114,7 +114,7 @@ func main() {
 }
 
 func logWrapThunk(t callee.Thunk) callee.Thunk {
-	return func(cp *msg.CallPayload) (interface{}, error) {
+	return func(cp *message.CallPayload) (interface{}, error) {
 		log.Printf("received call for %s from %v", cp.URI, cp.MsgUUID)
 		v, err := t(cp)
 		log.Printf("sending result for %s from %v", cp.URI, cp.MsgUUID)
@@ -122,7 +122,7 @@ func logWrapThunk(t callee.Thunk) callee.Thunk {
 	}
 }
 
-func delayThunk(cp *msg.CallPayload) (interface{}, error) {
+func delayThunk(cp *message.CallPayload) (interface{}, error) {
 	var s string
 	if err := json.Unmarshal(cp.Args, &s); err != nil {
 		return nil, err
@@ -139,7 +139,7 @@ func delay(i int) int {
 	return i
 }
 
-func reverseThunk(cp *msg.CallPayload) (interface{}, error) {
+func reverseThunk(cp *message.CallPayload) (interface{}, error) {
 	var s string
 	if err := json.Unmarshal(cp.Args, &s); err != nil {
 		return nil, err
@@ -155,7 +155,7 @@ func reverse(s string) string {
 	return string(chars)
 }
 
-func echoThunk(cp *msg.CallPayload) (interface{}, error) {
+func echoThunk(cp *message.CallPayload) (interface{}, error) {
 	var s string
 	if err := json.Unmarshal(cp.Args, &s); err != nil {
 		return nil, err

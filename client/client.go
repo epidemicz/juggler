@@ -8,7 +8,7 @@
 // goroutine. RPC calls that did not return a result before the
 // call timeout expired generate a custom ExpMsg message type, so an
 // RPC call that succeeded (that is, for which the server returned
-// an OK message, not an ERR) either generates a RES or an EXP,
+// an ACK message, not a NACK) either generates a RES or an EXP,
 // but never both or none.
 package client
 
@@ -22,7 +22,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/PuerkitoBio/juggler/broker"
-	"github.com/PuerkitoBio/juggler/msg"
+	"github.com/PuerkitoBio/juggler/message"
 	"github.com/gorilla/websocket"
 	"github.com/pborman/uuid"
 )
@@ -76,14 +76,14 @@ func (c *Client) handleMessages() {
 			return
 		}
 
-		m, err := msg.UnmarshalResponse(r)
+		m, err := message.UnmarshalResponse(r)
 		if err != nil {
 			logf(c.logFunc, "client: UnmarshalResponse failed: %v; skipping message", err)
 			continue
 		}
 
 		switch m := m.(type) {
-		case *msg.Res:
+		case *message.Res:
 			// got the result, do not trigger an expired message
 			if ok := c.deletePending(m.Payload.For.String()); !ok {
 				// if an expired message got here first, then drop the
@@ -91,8 +91,8 @@ func (c *Client) handleMessages() {
 				continue
 			}
 
-		case *msg.Err:
-			if m.Payload.ForType == msg.CallMsg {
+		case *message.Nack:
+			if m.Payload.ForType == message.CallMsg {
 				// won't get any result for this call (unless already expired)
 				c.deletePending(m.Payload.For.String())
 			}
@@ -150,7 +150,7 @@ func (c *Client) Call(uri string, v interface{}, timeout time.Duration) (uuid.UU
 	if timeout == 0 {
 		timeout = c.callTimeout
 	}
-	m, err := msg.NewCall(uri, v, timeout)
+	m, err := message.NewCall(uri, v, timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +165,7 @@ func (c *Client) Call(uri string, v interface{}, timeout time.Duration) (uuid.UU
 	return m.UUID(), nil
 }
 
-func (c *Client) handleExpiredCall(m *msg.Call, timeout time.Duration) {
+func (c *Client) handleExpiredCall(m *message.Call, timeout time.Duration) {
 	// wait for the timeout
 	if timeout <= 0 {
 		timeout = broker.DefaultCallTimeout
@@ -206,7 +206,7 @@ func (c *Client) deletePending(key string) bool {
 // returns the UUID of the sub message on success, or an error if
 // the request could not be sent to the server.
 func (c *Client) Sub(channel string, pattern bool) (uuid.UUID, error) {
-	m := msg.NewSub(channel, pattern)
+	m := message.NewSub(channel, pattern)
 	if err := c.conn.WriteJSON(m); err != nil {
 		return nil, err
 	}
@@ -218,7 +218,7 @@ func (c *Client) Sub(channel string, pattern bool) (uuid.UUID, error) {
 // returns the UUID of the unsb message on success, or an error if
 // the request could not be sent to the server.
 func (c *Client) Unsb(channel string, pattern bool) (uuid.UUID, error) {
-	m := msg.NewUnsb(channel, pattern)
+	m := message.NewUnsb(channel, pattern)
 	if err := c.conn.WriteJSON(m); err != nil {
 		return nil, err
 	}
@@ -230,7 +230,7 @@ func (c *Client) Unsb(channel string, pattern bool) (uuid.UUID, error) {
 // the UUID of the pub message on success, or an error if the request could
 // not be sent to the server.
 func (c *Client) Pub(channel string, v interface{}) (uuid.UUID, error) {
-	m, err := msg.NewPub(channel, v)
+	m, err := message.NewPub(channel, v)
 	if err != nil {
 		return nil, err
 	}
@@ -243,15 +243,15 @@ func (c *Client) Pub(channel string, v interface{}) (uuid.UUID, error) {
 // Handler defines the method required to handle a message received
 // from the server.
 type Handler interface {
-	Handle(context.Context, *Client, msg.Msg)
+	Handle(context.Context, *Client, message.Msg)
 }
 
 // HandlerFunc is a function that implements the Handler interface.
-type HandlerFunc func(context.Context, *Client, msg.Msg)
+type HandlerFunc func(context.Context, *Client, message.Msg)
 
 // Handle implements Handler for a HandlerFunc. It calls fn
 // with the parameters.
-func (fn HandlerFunc) Handle(ctx context.Context, cli *Client, m msg.Msg) {
+func (fn HandlerFunc) Handle(ctx context.Context, cli *Client, m message.Msg) {
 	fn(ctx, cli, m)
 }
 
@@ -292,8 +292,8 @@ func SetLogFunc(fn func(string, ...interface{})) Option {
 // result has expired. As such, its message type returns false for
 // both IsRead and IsWrite.
 type Exp struct {
-	msg.Meta `json:"meta"`
-	Payload  struct {
+	message.Meta `json:"meta"`
+	Payload      struct {
 		For  uuid.UUID       `json:"for"`           // no ForType, because always CALL
 		URI  string          `json:"uri,omitempty"` // URI of the CALL
 		Args json.RawMessage `json:"args"`
@@ -301,12 +301,12 @@ type Exp struct {
 }
 
 // ExpMsg is the message type of the call expiration message.
-var ExpMsg = msg.RegisterCustomMsg("EXP")
+var ExpMsg = message.Register("EXP")
 
 // newExp creates a new expired message for the provided call message.
-func newExp(m *msg.Call) *Exp {
+func newExp(m *message.Call) *Exp {
 	exp := &Exp{
-		Meta: msg.NewMeta(ExpMsg),
+		Meta: message.NewMeta(ExpMsg),
 	}
 	exp.Payload.For = m.UUID()
 	exp.Payload.URI = m.Payload.URI

@@ -10,7 +10,7 @@ import (
 
 	"github.com/PuerkitoBio/juggler/broker"
 	"github.com/PuerkitoBio/juggler/internal/redistest"
-	"github.com/PuerkitoBio/juggler/msg"
+	"github.com/PuerkitoBio/juggler/message"
 	"github.com/garyburd/redigo/redis"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/assert"
@@ -45,7 +45,7 @@ func testBrokerCallOrRes(t *testing.T, keyFmt string, run func(*Broker, uuid.UUI
 		}
 	}
 
-	// the first 2 msg uuids should be present, in inverted order (LPUSH)
+	// the first 2 message uuids should be present, in inverted order (LPUSH)
 	key := fmt.Sprintf(keyFmt, keyUUID)
 	expectUUIDs(t, pool.Get(), key, uuids[1], uuids[0])
 
@@ -73,7 +73,7 @@ func testBrokerCallOrRes(t *testing.T, keyFmt string, run func(*Broker, uuid.UUI
 func TestBrokerCall(t *testing.T) {
 	connUUID := uuid.NewRandom()
 	testBrokerCallOrRes(t, callKey, func(b *Broker, keyParm uuid.UUID) (uuid.UUID, error) {
-		cp := &msg.CallPayload{
+		cp := &message.CallPayload{
 			ConnUUID: connUUID,
 			MsgUUID:  uuid.NewRandom(),
 			URI:      keyParm.String(),
@@ -85,7 +85,7 @@ func TestBrokerCall(t *testing.T) {
 
 func TestBrokerResult(t *testing.T) {
 	testBrokerCallOrRes(t, resKey, func(b *Broker, keyParm uuid.UUID) (uuid.UUID, error) {
-		rp := &msg.ResPayload{
+		rp := &message.ResPayload{
 			ConnUUID: keyParm,
 			MsgUUID:  uuid.NewRandom(),
 			URI:      "z",
@@ -143,7 +143,7 @@ func TestPublish(t *testing.T) {
 	for i, c := range cases {
 		b, err := json.Marshal(c.v)
 		require.NoError(t, err, "marshal case %d", i)
-		pp := &msg.PubPayload{MsgUUID: uuid.NewRandom(), Args: b}
+		pp := &message.PubPayload{MsgUUID: uuid.NewRandom(), Args: b}
 		require.NoError(t, brk.Publish(c.ch, pp), "Publish event %d", i)
 	}
 
@@ -159,7 +159,7 @@ func expectUUIDs(t *testing.T, rc redis.Conn, key string, uuids ...uuid.UUID) {
 
 	if assert.Equal(t, len(uuids), len(vals), "number of items") {
 		for i, v := range vals {
-			var cp msg.CallPayload
+			var cp message.CallPayload
 			require.NoError(t, json.Unmarshal(v, &cp), "unmarshal into CallPayload")
 			assert.Equal(t, uuids[i], cp.MsgUUID, "expected MsgUUID at %d", i)
 		}

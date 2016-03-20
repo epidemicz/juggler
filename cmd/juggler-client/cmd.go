@@ -12,7 +12,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/PuerkitoBio/juggler/client"
-	"github.com/PuerkitoBio/juggler/msg"
+	"github.com/PuerkitoBio/juggler/message"
 	"github.com/gorilla/websocket"
 )
 
@@ -110,29 +110,29 @@ var connectCmd = &cmd{
 
 type connMsgLogger int
 
-func (l connMsgLogger) Handle(ctx context.Context, cli *client.Client, m msg.Msg) {
+func (l connMsgLogger) Handle(ctx context.Context, cli *client.Client, m message.Msg) {
 	var s string
 	switch m := m.(type) {
-	case *msg.Err:
+	case *message.Nack:
 		s = fmt.Sprintf("for %s %v (%s)", m.Payload.ForType, m.Payload.For, m.Payload.Message)
-	case *msg.OK:
+	case *message.Ack:
 		s = fmt.Sprintf("for %s %v", m.Payload.ForType, m.Payload.For)
-	case *msg.Res:
+	case *message.Res:
 		n := len(m.Payload.Args)
 		if n > 40 {
 			n = 40
 		}
 		val := string(m.Payload.Args[:n])
-		s = fmt.Sprintf("for %s %v (%s)", msg.CallMsg, m.Payload.For, val)
+		s = fmt.Sprintf("for %s %v (%s)", message.CallMsg, m.Payload.For, val)
 	case *client.Exp:
-		s = fmt.Sprintf("for %s %v", msg.CallMsg, m.Payload.For)
-	case *msg.Evnt:
+		s = fmt.Sprintf("for %s %v", message.CallMsg, m.Payload.For)
+	case *message.Evnt:
 		n := len(m.Payload.Args)
 		if n > 40 {
 			n = 40
 		}
 		val := string(m.Payload.Args[:n])
-		s = fmt.Sprintf("for %s %v (%s)", msg.PubMsg, m.Payload.For, val)
+		s = fmt.Sprintf("for %s %v (%s)", message.PubMsg, m.Payload.For, val)
 	}
 	printf("[%d] <<< %-4s message: %v %s", l, m.Type(), m.UUID(), s)
 }

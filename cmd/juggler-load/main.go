@@ -24,7 +24,7 @@ import (
 
 	"github.com/PuerkitoBio/juggler"
 	"github.com/PuerkitoBio/juggler/client"
-	"github.com/PuerkitoBio/juggler/msg"
+	"github.com/PuerkitoBio/juggler/message"
 	"github.com/gorilla/websocket"
 )
 
@@ -69,8 +69,8 @@ Duration:    {{ .Run.Duration | printf "%s" }}
 
 Actual Duration: {{ .Run.ActualDuration | printf "%s" }}
 Calls:           {{ .Run.Calls }}
-OK:              {{ .Run.OK }}
-Errors:          {{ .Run.Err }}
+Acks:            {{ .Run.Ack }}
+Nacks:           {{ .Run.Nack }}
 Results:         {{ .Run.Res }}
 Expired:         {{ .Run.Exp }}
 
@@ -106,15 +106,15 @@ ActiveConns:        {{.Before.Juggler.ActiveConns | printf "%-15d"}} {{.After.Ju
 MsgsRead:           {{.Before.Juggler.MsgsRead | printf "%-15d"}} {{.After.Juggler.MsgsRead | printf "%-15d"}} {{subi .After.Juggler.MsgsRead .Before.Juggler.MsgsRead }}
 MsgsWrite:          {{.Before.Juggler.MsgsWrite | printf "%-15d"}} {{.After.Juggler.MsgsWrite | printf "%-15d"}} {{subi .After.Juggler.MsgsWrite .Before.Juggler.MsgsWrite }}
 MsgsCALL:           {{.Before.Juggler.MsgsCALL | printf "%-15d"}} {{.After.Juggler.MsgsCALL | printf "%-15d"}} {{subi .After.Juggler.MsgsCALL .Before.Juggler.MsgsCALL }}
-MsgsOK:             {{.Before.Juggler.MsgsOK | printf "%-15d"}} {{.After.Juggler.MsgsOK | printf "%-15d"}} {{subi .After.Juggler.MsgsOK .Before.Juggler.MsgsOK }}
-MsgsERR:            {{.Before.Juggler.MsgsERR | printf "%-15d"}} {{.After.Juggler.MsgsERR | printf "%-15d"}} {{subi .After.Juggler.MsgsERR .Before.Juggler.MsgsERR }}
+MsgsACK:             {{.Before.Juggler.MsgsACK | printf "%-15d"}} {{.After.Juggler.MsgsACK | printf "%-15d"}} {{subi .After.Juggler.MsgsACK .Before.Juggler.MsgsACK }}
+MsgsNACK:            {{.Before.Juggler.MsgsNACK | printf "%-15d"}} {{.After.Juggler.MsgsNACK | printf "%-15d"}} {{subi .After.Juggler.MsgsNACK .Before.Juggler.MsgsNACK }}
 Msgs:               {{.Before.Juggler.Msgs | printf "%-15d"}} {{.After.Juggler.Msgs | printf "%-15d"}} {{subi .After.Juggler.Msgs .Before.Juggler.Msgs }}
 MsgsRES:            {{.Before.Juggler.MsgsRES | printf "%-15d"}} {{.After.Juggler.MsgsRES | printf "%-15d"}} {{subi .After.Juggler.MsgsRES .Before.Juggler.MsgsRES }}
 RecoveredPanics:    {{.Before.Juggler.RecoveredPanics | printf "%-15d"}} {{.After.Juggler.RecoveredPanics | printf "%-15d"}} {{subi .After.Juggler.RecoveredPanics .Before.Juggler.RecoveredPanics }}
 SlowProcessMsg:     {{.Before.Juggler.SlowProcessMsg | printf "%-15d"}} {{.After.Juggler.SlowProcessMsg | printf "%-15d"}} {{subi .After.Juggler.SlowProcessMsg .Before.Juggler.SlowProcessMsg }}
 SlowProcessMsgCALL: {{.Before.Juggler.SlowProcessMsgCALL | printf "%-15d"}} {{.After.Juggler.SlowProcessMsgCALL | printf "%-15d"}} {{subi .After.Juggler.SlowProcessMsgCALL .Before.Juggler.SlowProcessMsgCALL }}
-SlowProcessMsgOK:   {{.Before.Juggler.SlowProcessMsgOK | printf "%-15d"}} {{.After.Juggler.SlowProcessMsgOK | printf "%-15d"}} {{subi .After.Juggler.SlowProcessMsgOK .Before.Juggler.SlowProcessMsgOK }}
-SlowProcessMsgERR:  {{.Before.Juggler.SlowProcessMsgERR | printf "%-15d"}} {{.After.Juggler.SlowProcessMsgERR | printf "%-15d"}} {{subi .After.Juggler.SlowProcessMsgERR .Before.Juggler.SlowProcessMsgERR }}
+SlowProcessMsgACK:   {{.Before.Juggler.SlowProcessMsgACK | printf "%-15d"}} {{.After.Juggler.SlowProcessMsgACK | printf "%-15d"}} {{subi .After.Juggler.SlowProcessMsgACK .Before.Juggler.SlowProcessMsgACK }}
+SlowProcessMsgNACK:  {{.Before.Juggler.SlowProcessMsgNACK | printf "%-15d"}} {{.After.Juggler.SlowProcessMsgNACK | printf "%-15d"}} {{subi .After.Juggler.SlowProcessMsgNACK .Before.Juggler.SlowProcessMsgNACK }}
 SlowProcessMsgRES:  {{.Before.Juggler.SlowProcessMsgRES | printf "%-15d"}} {{.After.Juggler.SlowProcessMsgRES | printf "%-15d"}} {{subi .After.Juggler.SlowProcessMsgRES .Before.Juggler.SlowProcessMsgRES }}
 TotalConnGoros:     {{.Before.Juggler.TotalConnGoros | printf "%-15d"}} {{.After.Juggler.TotalConnGoros | printf "%-15d"}} {{subi .After.Juggler.TotalConnGoros .Before.Juggler.TotalConnGoros }}
 TotalConns:         {{.Before.Juggler.TotalConns | printf "%-15d"}} {{.After.Juggler.TotalConns | printf "%-15d"}} {{subi .After.Juggler.TotalConns .Before.Juggler.TotalConns }}
@@ -259,8 +259,8 @@ type runStats struct {
 	ActualDuration time.Duration
 
 	Calls int64
-	OK    int64
-	Err   int64
+	Ack   int64
+	Nack  int64
 	Res   int64
 	Exp   int64
 }
@@ -270,16 +270,16 @@ type expVars struct {
 		ActiveConnGoros    int
 		ActiveConns        int
 		MsgsCALL           int
-		MsgsERR            int
+		MsgsNACK           int
 		Msgs               int
-		MsgsOK             int
+		MsgsACK            int
 		MsgsRead           int
 		RecoveredPanics    int
 		MsgsRES            int
 		SlowProcessMsg     int
 		SlowProcessMsgCALL int
-		SlowProcessMsgERR  int
-		SlowProcessMsgOK   int
+		SlowProcessMsgNACK int
+		SlowProcessMsgACK  int
 		SlowProcessMsgRES  int
 		TotalConnGoros     int
 		TotalConns         int
@@ -421,10 +421,10 @@ func runClient(stats *runStats, started chan<- struct{}, stop <-chan struct{}, r
 		&websocket.Dialer{Subprotocols: []string{stats.Protocol}},
 		stats.Addr, nil,
 		client.SetLogFunc(juggler.DiscardLog),
-		client.SetHandler(client.HandlerFunc(func(ctx context.Context, c *client.Client, m msg.Msg) {
+		client.SetHandler(client.HandlerFunc(func(ctx context.Context, c *client.Client, m message.Msg) {
 			switch m.Type() {
-			case msg.ResMsg:
-				rm := m.(*msg.Res)
+			case message.ResMsg:
+				rm := m.(*message.Res)
 				mu.Lock()
 				dur := time.Now().Sub(startTimes[rm.Payload.For.String()])
 				latencies = append(latencies, dur)
@@ -432,11 +432,11 @@ func runClient(stats *runStats, started chan<- struct{}, stop <-chan struct{}, r
 				atomic.AddInt64(&stats.Res, 1)
 			case client.ExpMsg:
 				atomic.AddInt64(&stats.Exp, 1)
-			case msg.OKMsg:
-				atomic.AddInt64(&stats.OK, 1)
+			case message.AckMsg:
+				atomic.AddInt64(&stats.Ack, 1)
 				return
-			case msg.ErrMsg:
-				atomic.AddInt64(&stats.Err, 1)
+			case message.NackMsg:
+				atomic.AddInt64(&stats.Nack, 1)
 			default:
 				log.Fatalf("unexpected message type %s", m.Type())
 			}

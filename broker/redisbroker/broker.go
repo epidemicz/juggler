@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/juggler/broker"
-	"github.com/PuerkitoBio/juggler/msg"
+	"github.com/PuerkitoBio/juggler/message"
 	"github.com/garyburd/redigo/redis"
 	"github.com/pborman/uuid"
 )
@@ -101,14 +101,14 @@ const (
 )
 
 // Call registers a call request in the broker.
-func (b *Broker) Call(cp *msg.CallPayload, timeout time.Duration) error {
+func (b *Broker) Call(cp *message.CallPayload, timeout time.Duration) error {
 	k1 := fmt.Sprintf(callTimeoutKey, cp.URI, cp.MsgUUID)
 	k2 := fmt.Sprintf(callKey, cp.URI)
 	return registerCallOrRes(b.Pool, cp, timeout, b.CallCap, k1, k2)
 }
 
 // Result registers a call result in the broker.
-func (b *Broker) Result(rp *msg.ResPayload, timeout time.Duration) error {
+func (b *Broker) Result(rp *message.ResPayload, timeout time.Duration) error {
 	k1 := fmt.Sprintf(resTimeoutKey, rp.ConnUUID, rp.MsgUUID)
 	k2 := fmt.Sprintf(resKey, rp.ConnUUID)
 	return registerCallOrRes(b.Pool, rp, timeout, b.ResultCap, k1, k2)
@@ -139,7 +139,7 @@ func registerCallOrRes(pool Pool, pld interface{}, timeout time.Duration, cap in
 }
 
 // Publish publishes an event to a channel.
-func (b *Broker) Publish(channel string, pp *msg.PubPayload) error {
+func (b *Broker) Publish(channel string, pp *message.PubPayload) error {
 	p, err := json.Marshal(pp)
 	if err != nil {
 		return err

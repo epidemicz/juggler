@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/juggler/internal/redistest"
-	"github.com/PuerkitoBio/juggler/msg"
+	"github.com/PuerkitoBio/juggler/message"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -43,13 +43,13 @@ func TestCalls(t *testing.T) {
 	time.Sleep(1100 * time.Millisecond)
 
 	cases := []struct {
-		cp      *msg.CallPayload
+		cp      *message.CallPayload
 		timeout time.Duration
 		exp     bool
 	}{
-		{&msg.CallPayload{ConnUUID: uuid.NewRandom(), MsgUUID: uuid.NewRandom(), URI: "a"}, time.Second, true},
-		{&msg.CallPayload{ConnUUID: uuid.NewRandom(), MsgUUID: uuid.NewRandom(), URI: "b"}, time.Second, false},
-		{&msg.CallPayload{ConnUUID: uuid.NewRandom(), MsgUUID: uuid.NewRandom(), URI: "a"}, time.Minute, true},
+		{&message.CallPayload{ConnUUID: uuid.NewRandom(), MsgUUID: uuid.NewRandom(), URI: "a"}, time.Second, true},
+		{&message.CallPayload{ConnUUID: uuid.NewRandom(), MsgUUID: uuid.NewRandom(), URI: "b"}, time.Second, false},
+		{&message.CallPayload{ConnUUID: uuid.NewRandom(), MsgUUID: uuid.NewRandom(), URI: "a"}, time.Minute, true},
 	}
 	var expected []uuid.UUID
 	for i, c := range cases {

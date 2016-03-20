@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/juggler/broker"
-	"github.com/PuerkitoBio/juggler/msg"
+	"github.com/PuerkitoBio/juggler/message"
 	"github.com/garyburd/redigo/redis"
 	"github.com/pborman/uuid"
 )
@@ -23,7 +23,7 @@ type resultsConn struct {
 
 	// once makes sure only the first call to Results starts the goroutine.
 	once sync.Once
-	ch   chan *msg.ResPayload
+	ch   chan *message.ResPayload
 
 	// errmu protects access to err.
 	errmu sync.Mutex
@@ -49,9 +49,9 @@ func (c *resultsConn) ResultsErr() error {
 
 // Results returns a stream of call results for the connUUID specified when
 // creating the resultsConn.
-func (c *resultsConn) Results() <-chan *msg.ResPayload {
+func (c *resultsConn) Results() <-chan *message.ResPayload {
 	c.once.Do(func() {
-		c.ch = make(chan *msg.ResPayload)
+		c.ch = make(chan *message.ResPayload)
 
 		go func() {
 			defer close(c.ch)
@@ -77,7 +77,7 @@ func (c *resultsConn) Results() <-chan *msg.ResPayload {
 				}
 
 				// unmarshal the payload
-				var rp msg.ResPayload
+				var rp message.ResPayload
 				if err := unmarshalBRPOPValue(&rp, v); err != nil {
 					logf(c.logFn, "Results: BRPOP failed to unmarshal result payload: %v", err)
 					continue

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/juggler/internal/redistest"
-	"github.com/PuerkitoBio/juggler/msg"
+	"github.com/PuerkitoBio/juggler/message"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,16 +44,16 @@ func TestPubSub(t *testing.T) {
 
 	cases := []struct {
 		ch   string
-		pp   *msg.PubPayload
+		pp   *message.PubPayload
 		exp  bool
 		unsb string
 	}{
-		{"a", &msg.PubPayload{MsgUUID: uuid.NewRandom()}, true, ""},
-		{"b", &msg.PubPayload{MsgUUID: uuid.NewRandom()}, true, ""},
-		{"c", &msg.PubPayload{MsgUUID: uuid.NewRandom()}, false, "a"},
-		{"a", &msg.PubPayload{MsgUUID: uuid.NewRandom()}, false, ""},
-		{"b", &msg.PubPayload{MsgUUID: uuid.NewRandom()}, true, "b"},
-		{"b", &msg.PubPayload{MsgUUID: uuid.NewRandom()}, false, ""},
+		{"a", &message.PubPayload{MsgUUID: uuid.NewRandom()}, true, ""},
+		{"b", &message.PubPayload{MsgUUID: uuid.NewRandom()}, true, ""},
+		{"c", &message.PubPayload{MsgUUID: uuid.NewRandom()}, false, "a"},
+		{"a", &message.PubPayload{MsgUUID: uuid.NewRandom()}, false, ""},
+		{"b", &message.PubPayload{MsgUUID: uuid.NewRandom()}, true, "b"},
+		{"b", &message.PubPayload{MsgUUID: uuid.NewRandom()}, false, ""},
 	}
 	var expected []uuid.UUID
 	for i, c := range cases {

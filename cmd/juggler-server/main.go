@@ -19,7 +19,7 @@ import (
 	"github.com/PuerkitoBio/juggler"
 	"github.com/PuerkitoBio/juggler/broker"
 	"github.com/PuerkitoBio/juggler/broker/redisbroker"
-	"github.com/PuerkitoBio/juggler/msg"
+	"github.com/PuerkitoBio/juggler/message"
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/websocket"
 )
@@ -98,8 +98,8 @@ func newHandler(conf *Server, logFn func(string, ...interface{})) juggler.Handle
 	panicURI := conf.PanicURI
 	writeTimeout := conf.WriteTimeout
 
-	process := juggler.HandlerFunc(func(ctx context.Context, c *juggler.Conn, m msg.Msg) {
-		if call, ok := m.(*msg.Call); ok {
+	process := juggler.HandlerFunc(func(ctx context.Context, c *juggler.Conn, m message.Msg) {
+		if call, ok := m.(*message.Call); ok {
 			switch call.Payload.URI {
 			case closeURI:
 				wsc := c.UnderlyingConn()

@@ -8,19 +8,19 @@ import (
 
 	"github.com/PuerkitoBio/juggler"
 	"github.com/PuerkitoBio/juggler/broker"
-	"github.com/PuerkitoBio/juggler/msg"
+	"github.com/PuerkitoBio/juggler/message"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type mockCalleeBroker struct {
-	cps []*msg.CallPayload
+	cps []*message.CallPayload
 	err error
-	rps []*msg.ResPayload
+	rps []*message.ResPayload
 }
 
-func (b *mockCalleeBroker) Result(rp *msg.ResPayload, timeout time.Duration) error {
+func (b *mockCalleeBroker) Result(rp *message.ResPayload, timeout time.Duration) error {
 	b.rps = append(b.rps, rp)
 	return nil
 }
@@ -30,12 +30,12 @@ func (b *mockCalleeBroker) Calls(uris ...string) (broker.CallsConn, error) {
 }
 
 type mockCallsConn struct {
-	cps []*msg.CallPayload
+	cps []*message.CallPayload
 	err error
 }
 
-func (c *mockCallsConn) Calls() <-chan *msg.CallPayload {
-	ch := make(chan *msg.CallPayload)
+func (c *mockCallsConn) Calls() <-chan *message.CallPayload {
+	ch := make(chan *message.CallPayload)
 	go func() {
 		for _, cp := range c.cps {
 			ch <- cp
@@ -48,12 +48,12 @@ func (c *mockCallsConn) Calls() <-chan *msg.CallPayload {
 func (c *mockCallsConn) CallsErr() error { return c.err }
 func (c *mockCallsConn) Close() error    { return nil }
 
-func okThunk(cp *msg.CallPayload) (interface{}, error) {
+func okThunk(cp *message.CallPayload) (interface{}, error) {
 	time.Sleep(time.Millisecond)
 	return "ok", nil
 }
 
-func errThunk(cp *msg.CallPayload) (interface{}, error) {
+func errThunk(cp *message.CallPayload) (interface{}, error) {
 	time.Sleep(time.Millisecond)
 	return nil, io.ErrUnexpectedEOF
 }
@@ -61,7 +61,7 @@ func errThunk(cp *msg.CallPayload) (interface{}, error) {
 func TestCallee(t *testing.T) {
 	cuid := uuid.NewRandom()
 	brk := &mockCalleeBroker{
-		cps: []*msg.CallPayload{
+		cps: []*message.CallPayload{
 			{ConnUUID: cuid, MsgUUID: uuid.NewRandom(), URI: "ok", TTLAfterRead: time.Second},
 			{ConnUUID: cuid, MsgUUID: uuid.NewRandom(), URI: "err", TTLAfterRead: time.Second},
 			{ConnUUID: cuid, MsgUUID: uuid.NewRandom(), URI: "ok", TTLAfterRead: time.Millisecond}, // result will be dropped
@@ -70,12 +70,12 @@ func TestCallee(t *testing.T) {
 		err: io.EOF,
 	}
 
-	var er msg.ErrResult
+	var er message.ErrResult
 	er.Error.Message = io.ErrUnexpectedEOF.Error()
 	b, err := json.Marshal(er)
 	require.NoError(t, err, "Marshal ErrResult")
 
-	exp := []*msg.ResPayload{
+	exp := []*message.ResPayload{
 		{ConnUUID: cuid, MsgUUID: brk.cps[0].MsgUUID, URI: "ok", Args: json.RawMessage(`"ok"`)},
 		{ConnUUID: cuid, MsgUUID: brk.cps[1].MsgUUID, URI: "err", Args: b},
 		{ConnUUID: cuid, MsgUUID: brk.cps[3].MsgUUID, URI: "err", Args: b},

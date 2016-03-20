@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/juggler/broker"
-	"github.com/PuerkitoBio/juggler/msg"
+	"github.com/PuerkitoBio/juggler/message"
 	"github.com/garyburd/redigo/redis"
 )
 
@@ -29,7 +29,7 @@ type callsConn struct {
 
 	// once makes sure only the first call to Calls starts the goroutine.
 	once sync.Once
-	ch   chan *msg.CallPayload
+	ch   chan *message.CallPayload
 
 	// errmu protects access to err.
 	errmu sync.Mutex
@@ -55,9 +55,9 @@ func (c *callsConn) CallsErr() error {
 
 // Calls returns a stream of call requests for the URIs specified when
 // creating the callsConn.
-func (c *callsConn) Calls() <-chan *msg.CallPayload {
+func (c *callsConn) Calls() <-chan *message.CallPayload {
 	c.once.Do(func() {
-		c.ch = make(chan *msg.CallPayload)
+		c.ch = make(chan *message.CallPayload)
 
 		go func() {
 			defer close(c.ch)
@@ -88,7 +88,7 @@ func (c *callsConn) Calls() <-chan *msg.CallPayload {
 				}
 
 				// unmarshal the payload
-				var cp msg.CallPayload
+				var cp message.CallPayload
 				if err := unmarshalBRPOPValue(&cp, v); err != nil {
 					logf(c.logFn, "Calls: BRPOP failed to unmarshal call payload: %v", err)
 					continue

@@ -7,7 +7,7 @@ import (
 	"testing/quick"
 
 	"github.com/PuerkitoBio/juggler/internal/jugglertest"
-	"github.com/PuerkitoBio/juggler/msg"
+	"github.com/PuerkitoBio/juggler/message"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,12 +21,12 @@ func TestChain(t *testing.T) {
 	var b []byte
 
 	genHandler := func(char byte) HandlerFunc {
-		return HandlerFunc(func(ctx context.Context, c *Conn, m msg.Msg) {
+		return HandlerFunc(func(ctx context.Context, c *Conn, m message.Msg) {
 			b = append(b, char)
 		})
 	}
 	ch := Chain(genHandler('a'), genHandler('b'), genHandler('c'))
-	ch.Handle(context.Background(), &Conn{}, &msg.OK{})
+	ch.Handle(context.Background(), &Conn{}, &message.Ack{})
 
 	assert.Equal(t, "abc", string(b))
 }
@@ -35,15 +35,15 @@ type fakePubSubConn struct{}
 
 func (f fakePubSubConn) Subscribe(channel string, pattern bool) error   { return nil }
 func (f fakePubSubConn) Unsubscribe(channel string, pattern bool) error { return nil }
-func (f fakePubSubConn) Events() <-chan *msg.EvntPayload                { return nil }
+func (f fakePubSubConn) Events() <-chan *message.EvntPayload            { return nil }
 func (f fakePubSubConn) EventsErr() error                               { return nil }
 func (f fakePubSubConn) Close() error                                   { return nil }
 
 type fakeResultsConn struct{}
 
-func (f fakeResultsConn) Results() <-chan *msg.ResPayload { return nil }
-func (f fakeResultsConn) ResultsErr() error               { return nil }
-func (f fakeResultsConn) Close() error                    { return nil }
+func (f fakeResultsConn) Results() <-chan *message.ResPayload { return nil }
+func (f fakeResultsConn) ResultsErr() error                   { return nil }
+func (f fakeResultsConn) Close() error                        { return nil }
 
 func TestPanicRecover(t *testing.T) {
 	t.Parallel()
@@ -52,7 +52,7 @@ func TestPanicRecover(t *testing.T) {
 		require.Nil(t, recover(), "panic escaped the PanicRecover handler")
 	}()
 
-	panicer := HandlerFunc(func(ctx context.Context, c *Conn, m msg.Msg) {
+	panicer := HandlerFunc(func(ctx context.Context, c *Conn, m message.Msg) {
 		panic("a")
 	})
 	ph := PanicRecover(panicer)
@@ -61,7 +61,7 @@ func TestPanicRecover(t *testing.T) {
 	srv := &Server{LogFunc: dbgl.Printf}
 	conn := newConn(&websocket.Conn{}, srv)
 	conn.psc, conn.resc = fakePubSubConn{}, fakeResultsConn{}
-	ph.Handle(context.Background(), conn, &msg.OK{})
+	ph.Handle(context.Background(), conn, &message.Ack{})
 
 	err := conn.CloseErr
 	if assert.NotNil(t, err, "connection has been closed") {

@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/PuerkitoBio/juggler/broker"
-	"github.com/PuerkitoBio/juggler/msg"
+	"github.com/PuerkitoBio/juggler/message"
 	"github.com/garyburd/redigo/redis"
 )
 
@@ -20,7 +20,7 @@ type pubSubConn struct {
 
 	// once makes sure only the first call to Events starts the goroutine.
 	once sync.Once
-	evch chan *msg.EvntPayload
+	evch chan *message.EvntPayload
 
 	// errmu protects access to err.
 	errmu sync.Mutex
@@ -69,9 +69,9 @@ func (c *pubSubConn) subUnsub(ch string, pat bool, sub bool) error {
 
 // Events returns the stream of events from channels that the redis
 // connection is subscribed to.
-func (c *pubSubConn) Events() <-chan *msg.EvntPayload {
+func (c *pubSubConn) Events() <-chan *message.EvntPayload {
 	c.once.Do(func() {
-		c.evch = make(chan *msg.EvntPayload)
+		c.evch = make(chan *message.EvntPayload)
 
 		go func() {
 			defer close(c.evch)
@@ -110,12 +110,12 @@ func (c *pubSubConn) Events() <-chan *msg.EvntPayload {
 	return c.evch
 }
 
-func newEvntPayload(channel, pattern string, pld []byte) (*msg.EvntPayload, error) {
-	var pp msg.PubPayload
+func newEvntPayload(channel, pattern string, pld []byte) (*message.EvntPayload, error) {
+	var pp message.PubPayload
 	if err := json.Unmarshal(pld, &pp); err != nil {
 		return nil, err
 	}
-	ep := &msg.EvntPayload{
+	ep := &message.EvntPayload{
 		MsgUUID: pp.MsgUUID,
 		Channel: channel,
 		Pattern: pattern,

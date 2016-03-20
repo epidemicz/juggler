@@ -17,7 +17,7 @@ import (
 	"github.com/PuerkitoBio/juggler/internal/jugglertest"
 	"github.com/PuerkitoBio/juggler/internal/redistest"
 	"github.com/PuerkitoBio/juggler/internal/wstest"
-	"github.com/PuerkitoBio/juggler/msg"
+	"github.com/PuerkitoBio/juggler/message"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -93,7 +93,7 @@ func TestUpgrade(t *testing.T) {
 	srv.URL = strings.Replace(srv.URL, "http:", "ws:", 1)
 	defer srv.Close()
 
-	h := client.HandlerFunc(func(ctx context.Context, cli *client.Client, m msg.Msg) {})
+	h := client.HandlerFunc(func(ctx context.Context, cli *client.Client, m message.Msg) {})
 
 	// valid subprotocol - no protocol will be set to juggler automatically
 	cli, err := client.Dial(&websocket.Dialer{}, srv.URL, nil, client.SetHandler(h), client.SetLogFunc(dbgl.Printf))

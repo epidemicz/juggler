@@ -11,7 +11,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/PuerkitoBio/juggler/broker"
-	"github.com/PuerkitoBio/juggler/msg"
+	"github.com/PuerkitoBio/juggler/message"
 	"github.com/gorilla/websocket"
 	"github.com/pborman/uuid"
 )
@@ -198,9 +198,9 @@ func (c *Conn) Writer(timeout time.Duration) io.WriteCloser {
 	}
 }
 
-// Send sends the msg to the client. It calls the Server's
+// Send sends the message to the client. It calls the Server's
 // Handler if any, or ProcessMsg if nil.
-func (c *Conn) Send(m msg.Msg) {
+func (c *Conn) Send(m message.Msg) {
 	if h := c.srv.Handler; h != nil {
 		h.Handle(context.Background(), c, m)
 	} else {
@@ -219,7 +219,7 @@ func (c *Conn) results() {
 
 	ch := c.resc.Results()
 	for res := range ch {
-		c.Send(msg.NewRes(res))
+		c.Send(message.NewRes(res))
 	}
 
 	// results loop was stopped, the connection should be closed if it
@@ -238,7 +238,7 @@ func (c *Conn) pubSub() {
 
 	ch := c.psc.Events()
 	for ev := range ch {
-		c.Send(msg.NewEvnt(ev))
+		c.Send(message.NewEvnt(ev))
 	}
 
 	// pubsub loop was stopped, the connection should be closed if it
@@ -272,7 +272,7 @@ func (c *Conn) receive() {
 			c.wsConn.SetReadDeadline(time.Now().Add(to))
 		}
 
-		m, err := msg.UnmarshalRequest(r)
+		m, err := message.UnmarshalRequest(r)
 		if err != nil {
 			c.Close(err)
 			return

@@ -13,7 +13,7 @@ import (
 
 	"github.com/PuerkitoBio/juggler/internal/jugglertest"
 	"github.com/PuerkitoBio/juggler/internal/wstest"
-	"github.com/PuerkitoBio/juggler/msg"
+	"github.com/PuerkitoBio/juggler/message"
 	"github.com/gorilla/websocket"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/assert"
@@ -25,7 +25,7 @@ func TestClientClose(t *testing.T) {
 	srv := wstest.StartRecordingServer(t, done, ioutil.Discard)
 	defer srv.Close()
 
-	h := HandlerFunc(func(ctx context.Context, cli *Client, m msg.Msg) {})
+	h := HandlerFunc(func(ctx context.Context, cli *Client, m message.Msg) {})
 	cli, err := Dial(&websocket.Dialer{}, srv.URL, nil, SetHandler(h), SetLogFunc((&jugglertest.DebugLog{T: t}).Printf))
 	require.NoError(t, err, "Dial")
 
@@ -54,7 +54,7 @@ func TestClient(t *testing.T) {
 		expForUUID uuid.UUID
 		wg         sync.WaitGroup
 	)
-	h := HandlerFunc(func(ctx context.Context, cli *Client, m msg.Msg) {
+	h := HandlerFunc(func(ctx context.Context, cli *Client, m message.Msg) {
 		defer wg.Done()
 
 		mu.Lock()
@@ -74,24 +74,24 @@ func TestClient(t *testing.T) {
 	wg.Add(1)
 	type expected struct {
 		uid uuid.UUID
-		mt  msg.MessageType
+		mt  message.Type
 	}
 	var expectedResults []expected
 	callUUID, err := cli.Call("a", "call", 0)
 	require.NoError(t, err, "Call")
-	expectedResults = append(expectedResults, expected{callUUID, msg.CallMsg})
+	expectedResults = append(expectedResults, expected{callUUID, message.CallMsg})
 
 	uid, err := cli.Pub("b", "pub")
 	require.NoError(t, err, "Pub")
-	expectedResults = append(expectedResults, expected{uid, msg.PubMsg})
+	expectedResults = append(expectedResults, expected{uid, message.PubMsg})
 
 	uid, err = cli.Sub("c", false)
 	require.NoError(t, err, "Sub")
-	expectedResults = append(expectedResults, expected{uid, msg.SubMsg})
+	expectedResults = append(expectedResults, expected{uid, message.SubMsg})
 
 	uid, err = cli.Unsb("d", true)
 	require.NoError(t, err, "Unsb")
-	expectedResults = append(expectedResults, expected{uid, msg.UnsbMsg})
+	expectedResults = append(expectedResults, expected{uid, message.UnsbMsg})
 
 	// wait for any pending handlers
 	wg.Wait()
@@ -111,7 +111,7 @@ func TestClient(t *testing.T) {
 	dec := json.NewDecoder(r)
 	for i, exp := range expectedResults {
 		require.NoError(t, dec.Decode(&p), "Decode %d", i)
-		m, err := msg.Unmarshal(bytes.NewReader(p))
+		m, err := message.Unmarshal(bytes.NewReader(p))
 		require.NoError(t, err, "Unmarshal %d", i)
 		assert.Equal(t, exp.uid, m.UUID(), "%d: uuid", i)
 		assert.Equal(t, exp.mt, m.Type(), "%d: type", i)

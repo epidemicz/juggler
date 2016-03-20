@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/juggler/broker"
-	"github.com/PuerkitoBio/juggler/msg"
+	"github.com/PuerkitoBio/juggler/message"
 )
 
 // ErrCallExpired is returned when a call is processed but the
@@ -25,7 +25,7 @@ var ErrCallExpired = errors.New("juggler/callee: call expired")
 // to the type expected by the actual underlying function, call that
 // strongly-typed function, and transfer the results back in the
 // generic empty interface.
-type Thunk func(*msg.CallPayload) (interface{}, error)
+type Thunk func(*message.CallPayload) (interface{}, error)
 
 // Callee is a peer that handles call requests for some URIs.
 type Callee struct {
@@ -54,7 +54,7 @@ func SplitByHashSlot(uris []string) [][]string {
 // fn and storing the result so that it can be sent back to the caller.
 // If the call timeout is exceeded, the result is dropped and
 // ErrCallExpired is returned.
-func (c *Callee) InvokeAndStoreResult(cp *msg.CallPayload, fn Thunk) error {
+func (c *Callee) InvokeAndStoreResult(cp *message.CallPayload, fn Thunk) error {
 	ttl := cp.TTLAfterRead
 	start := time.Now()
 
@@ -111,13 +111,13 @@ func (c *Callee) Listen(m map[string]Thunk) error {
 	return conn.CallsErr()
 }
 
-func (c *Callee) storeResult(cp *msg.CallPayload, v interface{}, e error, timeout time.Duration) error {
+func (c *Callee) storeResult(cp *message.CallPayload, v interface{}, e error, timeout time.Duration) error {
 	// if there's an error, that's what gets stored
 	if e != nil {
 		if ms, ok := e.(json.Marshaler); ok {
 			v = ms
 		} else {
-			var er msg.ErrResult
+			var er message.ErrResult
 			er.Error.Message = e.Error()
 			v = er
 		}
@@ -128,7 +128,7 @@ func (c *Callee) storeResult(cp *msg.CallPayload, v interface{}, e error, timeou
 		return err
 	}
 
-	rp := &msg.ResPayload{
+	rp := &message.ResPayload{
 		ConnUUID: cp.ConnUUID,
 		MsgUUID:  cp.MsgUUID,
 		URI:      cp.URI,
