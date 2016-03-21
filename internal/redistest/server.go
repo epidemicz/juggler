@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -59,7 +61,14 @@ func StartCluster(t *testing.T, w io.Writer) (func(), []string) {
 	cmds := make([]*exec.Cmd, numNodes)
 	ports := make([]string, numNodes)
 	for i := 0; i < numNodes; i++ {
+		// the port number in a redis-cluster must be below 55535 because
+		// the nodes communicate with others on port p+10000. Try to get
+		// lucky and subtract 10000 from the random port received if it
+		// is too high.
 		port := getFreePort(t)
+		if n, _ := strconv.Atoi(port); n > 55535 {
+			port = strconv.Itoa(n - 10000)
+		}
 		cmd := startServerWithConfig(t, port, w, fmt.Sprintf(ClusterConfig, port))
 		cmds[i], ports[i] = cmd, port
 	}
@@ -75,13 +84,16 @@ func startServerWithConfig(t *testing.T, port string, w io.Writer, conf string) 
 	var args []string
 	if conf == "" {
 		args = []string{"--port", port}
+	} else {
+		args = []string{"-"}
 	}
 	c := exec.Command("redis-server", args...)
+	c.Dir = os.TempDir()
 
-	if w != nil {
-		c.Stderr = w
-		c.Stdout = w
-	}
+	//if w != nil {
+	c.Stderr = os.Stdout
+	c.Stdout = os.Stdout
+	//}
 	if conf != "" {
 		c.Stdin = strings.NewReader(conf)
 	}
@@ -90,7 +102,7 @@ func startServerWithConfig(t *testing.T, port string, w io.Writer, conf string) 
 
 	// wait for the server to start accepting connections
 	var ok bool
-	deadline := time.Now().Add(time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		conn, err := net.DialTimeout("tcp", ":"+port, time.Second)
 		if err == nil {
