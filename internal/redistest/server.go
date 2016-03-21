@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,11 +13,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// ClusterConfig is the configuration to use for servers started in
+// redis-cluster mode. The value must contain a single reference to
+// an integer placeholder (%d), the port number.
+var ClusterConfig = `
+port %d
+cluster-enabled yes
+cluster-config-file nodes.%[1]d.conf
+cluster-node-timeout 5000
+appendonly yes
+`
+
 // StartServer starts a redis-server instance on a free port.
 // It returns the started *exec.Cmd and the port used. The caller
 // should make sure to stop the command. If the redis-server
 // command is not found in the PATH, the test is skipped.
-func StartServer(t *testing.T, w io.Writer) (*exec.Cmd, string) {
+//
+// If w is not nil, both stdout and stderr of the server are
+// written to it. If a configuration is specified, it is supplied
+// to the server via stdin.
+func StartServer(t *testing.T, w io.Writer, conf string) (*exec.Cmd, string) {
+	return startServerWithConfig(t, w, conf)
+}
+
+func startServerWithConfig(t *testing.T, w io.Writer, conf string) (*exec.Cmd, string) {
 	if _, err := exec.LookPath("redis-server"); err != nil {
 		t.Skip("redis-server not found in $PATH")
 	}
@@ -27,10 +47,25 @@ func StartServer(t *testing.T, w io.Writer) (*exec.Cmd, string) {
 		c.Stderr = w
 		c.Stdout = w
 	}
+	if conf != "" {
+		c.Stdin = strings.NewReader(conf)
+	}
 	require.NoError(t, c.Start(), "start redis-server")
 
-	// wait a bit for the server to start listening... better way?
-	time.Sleep(500 * time.Millisecond)
+	// wait for the server to start accepting connections
+	var ok bool
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		conn, err := net.DialTimeout("tcp", ":"+port, time.Second)
+		if err == nil {
+			ok = true
+			conn.Close()
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	require.True(t, ok, "wait for redis-server to start")
+
 	t.Logf("redis-server started on port %s", port)
 	return c, port
 }

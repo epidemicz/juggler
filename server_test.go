@@ -23,7 +23,7 @@ import (
 )
 
 func TestServerServe(t *testing.T) {
-	cmd, port := redistest.StartServer(t, nil)
+	cmd, port := redistest.StartServer(t, nil, "")
 	defer cmd.Process.Kill()
 
 	done := make(chan bool, 1)
@@ -74,7 +74,7 @@ func TestServerServe(t *testing.T) {
 }
 
 func TestUpgrade(t *testing.T) {
-	cmd, port := redistest.StartServer(t, nil)
+	cmd, port := redistest.StartServer(t, nil, "")
 	defer cmd.Process.Kill()
 
 	dbgl := &jugglertest.DebugLog{T: t}

@@ -319,7 +319,7 @@ func runIntegrationTest(t *testing.T, conf *IntgConfig) {
 	// 5. n clients
 
 	// 1. redis-server
-	cmd, port := redistest.StartServer(t, nil)
+	cmd, port := redistest.StartServer(t, nil, "")
 	defer cmd.Process.Kill()
 
 	// 2. create the redis pool and broker

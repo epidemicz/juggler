@@ -20,7 +20,7 @@ import (
 const cap = 2
 
 func testBrokerCallOrRes(t *testing.T, keyFmt string, run func(*Broker, uuid.UUID) (uuid.UUID, error)) {
-	cmd, port := redistest.StartServer(t, nil)
+	cmd, port := redistest.StartServer(t, nil, "")
 	defer cmd.Process.Kill()
 
 	pool := redistest.NewPool(t, ":"+port)
@@ -96,7 +96,7 @@ func TestBrokerResult(t *testing.T) {
 }
 
 func TestPublish(t *testing.T) {
-	cmd, port := redistest.StartServer(t, nil)
+	cmd, port := redistest.StartServer(t, nil, "")
 	defer cmd.Process.Kill()
 
 	pool := redistest.NewPool(t, ":"+port)

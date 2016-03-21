@@ -13,7 +13,7 @@ import (
 )
 
 func TestPubSub(t *testing.T) {
-	cmd, port := redistest.StartServer(t, nil)
+	cmd, port := redistest.StartServer(t, nil, "")
 	defer cmd.Process.Kill()
 
 	pool := redistest.NewPool(t, ":"+port)
