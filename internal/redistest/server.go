@@ -56,22 +56,68 @@ func StartCluster(t *testing.T, w io.Writer) (func(), []string) {
 		t.Skip("redis-server not found in $PATH")
 	}
 
-	const numNodes = 3
+	const (
+		numNodes  = 3
+		hashSlots = 16384
+		maxPort   = 55535
+	)
 
 	cmds := make([]*exec.Cmd, numNodes)
 	ports := make([]string, numNodes)
+	slotsPerNode := hashSlots / numNodes
+
 	for i := 0; i < numNodes; i++ {
 		// the port number in a redis-cluster must be below 55535 because
 		// the nodes communicate with others on port p+10000. Try to get
 		// lucky and subtract 10000 from the random port received if it
 		// is too high.
 		port := getFreePort(t)
-		if n, _ := strconv.Atoi(port); n > 55535 {
+		if n, _ := strconv.Atoi(port); n >= maxPort {
 			port = strconv.Itoa(n - 10000)
 		}
 		cmd := startServerWithConfig(t, port, w, fmt.Sprintf(ClusterConfig, port))
 		cmds[i], ports[i] = cmd, port
+
+		// configure the cluster - add the slots
+		conn, err := redis.Dial("tcp", ":"+port)
+		require.NoError(t, err, "Dial to node %d", i)
+		args := redis.Args{"ADDSLOTS"}
+		for j := i * slotsPerNode; j < ((i + 1) * slotsPerNode); j++ {
+			args = args.Add(j)
+		}
+		if i == numNodes-1 {
+			// add all missing slots to the last node
+			for j := slotsPerNode * numNodes; j < hashSlots; j++ {
+				args = args.Add(j)
+			}
+		}
+
+		_, err = conn.Do("CLUSTER", args...)
+		require.NoError(t, err, "CLUSTER ADDSLOTS for %d", i)
+
+		if i != 0 {
+			// join the cluster
+			_, err = conn.Do("CLUSTER", "MEET", "127.0.0.1", ports[i-1])
+			require.NoError(t, err, "CLUSTER MEET for %d", i)
+		}
+		conn.Close()
 	}
+
+	// wait for the cluster to catch up
+	var ok bool
+	conn, err := redis.Dial("tcp", ":"+ports[0])
+	require.NoError(t, err, "Dial to node %s", ports[0])
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		s, err := redis.Values(conn.Do("CLUSTER", "SLOTS"))
+		require.NoError(t, err, "CLUSTER SLOTS")
+		if len(s) >= numNodes {
+			ok = true
+			break
+		}
+	}
+	conn.Close()
+	require.True(t, ok, "wait for cluster to form")
 
 	return func() {
 		for _, c := range cmds {
@@ -90,10 +136,10 @@ func startServerWithConfig(t *testing.T, port string, w io.Writer, conf string) 
 	c := exec.Command("redis-server", args...)
 	c.Dir = os.TempDir()
 
-	//if w != nil {
-	c.Stderr = os.Stdout
-	c.Stdout = os.Stdout
-	//}
+	if w != nil {
+		c.Stderr = w
+		c.Stdout = w
+	}
 	if conf != "" {
 		c.Stdin = strings.NewReader(conf)
 	}
