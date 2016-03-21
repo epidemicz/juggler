@@ -78,52 +78,64 @@ func StartCluster(t *testing.T, w io.Writer) (func(), []string) {
 		cmd := startServerWithConfig(t, port, w, fmt.Sprintf(ClusterConfig, port))
 		cmds[i], ports[i] = cmd, port
 
-		// configure the cluster - add the slots
-		conn, err := redis.Dial("tcp", ":"+port)
-		require.NoError(t, err, "Dial to node %d", i)
-		args := redis.Args{"ADDSLOTS"}
-		for j := i * slotsPerNode; j < ((i + 1) * slotsPerNode); j++ {
-			args = args.Add(j)
+		// configure the cluster - add the slots and join
+		var meetPort string
+		if i > 0 {
+			meetPort = ports[i-1]
 		}
+		countSlots := slotsPerNode
 		if i == numNodes-1 {
-			// add all missing slots to the last node
-			for j := slotsPerNode * numNodes; j < hashSlots; j++ {
-				args = args.Add(j)
-			}
+			// add all remaining slots in the last node
+			countSlots = hashSlots - (i * slotsPerNode)
 		}
-
-		_, err = conn.Do("CLUSTER", args...)
-		require.NoError(t, err, "CLUSTER ADDSLOTS for %d", i)
-
-		if i != 0 {
-			// join the cluster
-			_, err = conn.Do("CLUSTER", "MEET", "127.0.0.1", ports[i-1])
-			require.NoError(t, err, "CLUSTER MEET for %d", i)
-		}
-		conn.Close()
+		setupClusterNode(t, port, meetPort, i*slotsPerNode, countSlots)
 	}
 
 	// wait for the cluster to catch up
-	var ok bool
-	conn, err := redis.Dial("tcp", ":"+ports[0])
-	require.NoError(t, err, "Dial to node %s", ports[0])
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		s, err := redis.Values(conn.Do("CLUSTER", "SLOTS"))
-		require.NoError(t, err, "CLUSTER SLOTS")
-		if len(s) >= numNodes {
-			ok = true
-			break
-		}
-	}
-	conn.Close()
-	require.True(t, ok, "wait for cluster to form")
+	require.True(t, waitForCluster(t, ports[0], numNodes, 5*time.Second), "wait for cluster")
 
 	return func() {
 		for _, c := range cmds {
 			c.Process.Kill()
 		}
 	}, ports
+}
+
+func setupClusterNode(t *testing.T, port, meetPort string, start, count int) {
+	conn, err := redis.Dial("tcp", ":"+port)
+	require.NoError(t, err, "Dial to cluster node")
+	defer conn.Close()
+
+	args := redis.Args{"ADDSLOTS"}
+	for i := start; i < start+count; i++ {
+		args = args.Add(i)
+	}
+
+	_, err = conn.Do("CLUSTER", args...)
+	require.NoError(t, err, "CLUSTER ADDSLOTS")
+
+	if meetPort != "" {
+		// join the cluster
+		_, err = conn.Do("CLUSTER", "MEET", "127.0.0.1", meetPort)
+		require.NoError(t, err, "CLUSTER MEET")
+	}
+}
+
+func waitForCluster(t *testing.T, port string, expectedNodes int, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+
+	conn, err := redis.Dial("tcp", ":"+port)
+	require.NoError(t, err, "Dial")
+	defer conn.Close()
+
+	for time.Now().Before(deadline) {
+		vals, err := redis.Values(conn.Do("CLUSTER", "SLOTS"))
+		require.NoError(t, err, "CLUSTER SLOTS")
+		if len(vals) >= expectedNodes {
+			return true
+		}
+	}
+	return false
 }
 
 func startServerWithConfig(t *testing.T, port string, w io.Writer, conf string) *exec.Cmd {
@@ -144,24 +156,28 @@ func startServerWithConfig(t *testing.T, port string, w io.Writer, conf string) 
 		c.Stdin = strings.NewReader(conf)
 	}
 
+	// start the server
 	require.NoError(t, c.Start(), "start redis-server")
 
 	// wait for the server to start accepting connections
-	var ok bool
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		conn, err := net.DialTimeout("tcp", ":"+port, time.Second)
-		if err == nil {
-			ok = true
-			conn.Close()
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	require.True(t, ok, "wait for redis-server to start")
+	require.True(t, waitForPort(port, 5*time.Second), "wait for redis-server")
 
 	t.Logf("redis-server started on port %s", port)
 	return c
+}
+
+func waitForPort(port string, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+
+	for time.Now().Before(deadline) {
+		conn, err := net.DialTimeout("tcp", ":"+port, time.Second)
+		if err == nil {
+			conn.Close()
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return false
 }
 
 func getFreePort(t *testing.T) string {
