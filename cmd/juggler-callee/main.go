@@ -74,7 +74,7 @@ func main() {
 		keys = append(keys, k)
 	}
 
-	cc, err := c.Broker.Calls(keys...)
+	cc, err := c.Broker.NewCallsConn(keys...)
 	if err != nil {
 		log.Fatalf("Calls failed: %v", err)
 	}

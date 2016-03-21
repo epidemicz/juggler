@@ -88,7 +88,7 @@ var callOrResScript = redis.NewScript(2, `
 			return redis.error_reply("list capacity exceeded")
 		end
 		return res
-	`)
+`)
 
 const (
 	// redis cluster-compliant keys, so that both keys are in the same slot
@@ -152,9 +152,10 @@ func (b *Broker) Publish(channel string, pp *message.PubPayload) error {
 	return err
 }
 
-// PubSub returns a pub-sub connection that can be used to subscribe and
-// unsubscribe to channels, and to process incoming events.
-func (b *Broker) PubSub() (broker.PubSubConn, error) {
+// NewPubSubConn returns a new pub-sub connection that can be used
+// to subscribe to and unsubscribe from channels, and to process
+// incoming events.
+func (b *Broker) NewPubSubConn() (broker.PubSubConn, error) {
 	rc, err := b.Dial()
 	if err != nil {
 		return nil, err
@@ -162,9 +163,9 @@ func (b *Broker) PubSub() (broker.PubSubConn, error) {
 	return newPubSubConn(rc, b.LogFunc), nil
 }
 
-// Calls returns a calls connection that can be used to process the call
-// requests for the specified URIs.
-func (b *Broker) Calls(uris ...string) (broker.CallsConn, error) {
+// NewCallsConn returns a new calls connection that can be used
+// to process the call requests for the specified URIs.
+func (b *Broker) NewCallsConn(uris ...string) (broker.CallsConn, error) {
 	rc, err := b.Dial()
 	if err != nil {
 		return nil, err
@@ -172,9 +173,9 @@ func (b *Broker) Calls(uris ...string) (broker.CallsConn, error) {
 	return newCallsConn(rc, uris, b.Vars, b.BlockingTimeout, b.LogFunc), nil
 }
 
-// Results returns a results connection that can be used to process the call
-// results for the specified connection UUID.
-func (b *Broker) Results(connUUID uuid.UUID) (broker.ResultsConn, error) {
+// NewResultsConn returns a new results connection that can be used
+// to process the call results for the specified connection UUID.
+func (b *Broker) NewResultsConn(connUUID uuid.UUID) (broker.ResultsConn, error) {
 	rc, err := b.Dial()
 	if err != nil {
 		return nil, err

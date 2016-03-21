@@ -373,7 +373,7 @@ func runIntegrationTest(t *testing.T, conf *IntgConfig) {
 				LogFunc: dbgl.Printf,
 			}
 
-			conn, err := brk.Calls(uris...)
+			conn, err := brk.NewCallsConn(uris...)
 			if err != nil {
 				t.Fatalf("failed to get CallsConn: %v", err)
 			}

@@ -19,9 +19,9 @@ var DefaultCallTimeout = time.Minute
 
 // CallerBroker defines the methods for a broker in the caller role.
 type CallerBroker interface {
-	// Results returns a ResultsConn that can be used to process results
-	// from calls for the specified connection UUID.
-	Results(uuid.UUID) (ResultsConn, error)
+	// NewResultsConn returns a new ResultsConn that can be used
+	// to process results from calls for the specified connection UUID.
+	NewResultsConn(uuid.UUID) (ResultsConn, error)
 
 	// Call registers a call request in the broker.
 	Call(cp *message.CallPayload, timeout time.Duration) error
@@ -29,9 +29,9 @@ type CallerBroker interface {
 
 // CalleeBroker defines the methods for a broker in the callee role.
 type CalleeBroker interface {
-	// Calls returns a CallsConn that can be used to process call requests
-	// for the specified URIs.
-	Calls(uris ...string) (CallsConn, error)
+	// NewCallsConn returns a new CallsConn that can be used to
+	// process call requests for the specified URIs.
+	NewCallsConn(uris ...string) (CallsConn, error)
 
 	// Result registers a call result in the broker.
 	Result(rp *message.ResPayload, timeout time.Duration) error
@@ -39,10 +39,10 @@ type CalleeBroker interface {
 
 // PubSubBroker defines the methods for a broker in the pub-sub role.
 type PubSubBroker interface {
-	// PubSub returns a PubSubConn that can be used to manage subscriptions
-	// to pub-sub channels, and to process events sent on subscribed
-	// channels.
-	PubSub() (PubSubConn, error)
+	// NewPubSubConn returns a new PubSubConn that can be used to
+	// manage subscriptions to pub-sub channels, and to process
+	// events sent on subscribed channels.
+	NewPubSubConn() (PubSubConn, error)
 
 	// Publish publishes an event on the specified channel.
 	Publish(channel string, pp *message.PubPayload) error

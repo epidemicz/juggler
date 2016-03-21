@@ -25,7 +25,7 @@ func TestCalls(t *testing.T) {
 	}
 
 	// list calls on URI "a"
-	cc, err := brk.Calls("a")
+	cc, err := brk.NewCallsConn("a")
 	require.NoError(t, err, "get Calls connection")
 
 	// keep track of received calls

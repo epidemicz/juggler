@@ -106,7 +106,7 @@ func TestPublish(t *testing.T) {
 		LogFunc: logIfVerbose,
 	})
 
-	psc, err := brk.PubSub()
+	psc, err := brk.NewPubSubConn()
 	require.NoError(t, err, "get PubSubConn")
 
 	// subscribe to channel "a"

@@ -26,7 +26,7 @@ func TestResults(t *testing.T) {
 
 	// list results on this conn UUID
 	connUUID := uuid.NewRandom()
-	rc, err := brk.Results(connUUID)
+	rc, err := brk.NewResultsConn(connUUID)
 	require.NoError(t, err, "get Results connection")
 
 	// keep track of received results

@@ -108,12 +108,12 @@ func (srv *Server) ServeConn(conn *websocket.Conn) {
 
 	conn.SetReadLimit(srv.ReadLimit)
 	c := newConn(conn, srv)
-	resConn, err := srv.CallerBroker.Results(c.UUID)
+	resConn, err := srv.CallerBroker.NewResultsConn(c.UUID)
 	if err != nil {
 		logf(srv.LogFunc, "failed to create results connection: %v; dropping connection", err)
 		return
 	}
-	pubSubConn, err := srv.PubSubBroker.PubSub()
+	pubSubConn, err := srv.PubSubBroker.NewPubSubConn()
 	if err != nil {
 		logf(srv.LogFunc, "failed to create pubsub connection: %v; dropping connection", err)
 		return

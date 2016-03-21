@@ -92,7 +92,7 @@ func (c *Callee) Listen(m map[string]Thunk) error {
 	for k := range m {
 		uris = append(uris, k)
 	}
-	conn, err := c.Broker.Calls(uris...)
+	conn, err := c.Broker.NewCallsConn(uris...)
 	if err != nil {
 		return err
 	}

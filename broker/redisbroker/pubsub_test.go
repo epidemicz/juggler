@@ -24,7 +24,7 @@ func TestPubSub(t *testing.T) {
 	}
 
 	// list results on this conn UUID
-	psc, err := brk.PubSub()
+	psc, err := brk.NewPubSubConn()
 	require.NoError(t, err, "get PubSub connection")
 
 	// keep track of received events

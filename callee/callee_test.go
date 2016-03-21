@@ -25,7 +25,7 @@ func (b *mockCalleeBroker) Result(rp *message.ResPayload, timeout time.Duration)
 	return nil
 }
 
-func (b *mockCalleeBroker) Calls(uris ...string) (broker.CallsConn, error) {
+func (b *mockCalleeBroker) NewCallsConn(uris ...string) (broker.CallsConn, error) {
 	return &mockCallsConn{cps: b.cps, err: b.err}, nil
 }
 
