@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -25,7 +26,7 @@ port %s
 cluster-enabled yes
 cluster-config-file nodes.%[1]s.conf
 cluster-node-timeout 5000
-appendonly yes
+appendonly no
 `
 
 // StartServer starts a redis-server instance on a free port.
@@ -95,14 +96,15 @@ func StartCluster(t *testing.T, w io.Writer) (func(), []string) {
 	// wait for the cluster to catch up
 	require.True(t, waitForCluster(t, 10*time.Second, ports...), "wait for cluster")
 
-	// print cluster info to output if verbose, helps debugging
-	if testing.Verbose() {
-		printClusterInfo(t, ports[0])
-	}
-
 	return func() {
 		for _, c := range cmds {
 			c.Process.Kill()
+		}
+		for _, port := range ports {
+			if strings.HasPrefix(port, ":") {
+				port = port[1:]
+			}
+			os.Remove(filepath.Join(os.TempDir(), fmt.Sprintf("nodes.%s.conf", port)))
 		}
 	}, ports
 }
