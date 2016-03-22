@@ -92,7 +92,7 @@ func StartCluster(t *testing.T, w io.Writer) (func(), []string) {
 	}
 
 	// wait for the cluster to catch up
-	require.True(t, waitForCluster(t, ports[0], numNodes, 5*time.Second), "wait for cluster")
+	require.True(t, waitForCluster(t, 5*time.Second, ports...), "wait for cluster")
 
 	return func() {
 		for _, c := range cmds {
@@ -121,21 +121,27 @@ func setupClusterNode(t *testing.T, port, meetPort string, start, count int) {
 	}
 }
 
-func waitForCluster(t *testing.T, port string, expectedNodes int, timeout time.Duration) bool {
+func waitForCluster(t *testing.T, timeout time.Duration, ports ...string) bool {
 	deadline := time.Now().Add(timeout)
 
-	conn, err := redis.Dial("tcp", ":"+port)
-	require.NoError(t, err, "Dial")
-	defer conn.Close()
+	for _, port := range ports {
+		conn, err := redis.Dial("tcp", ":"+port)
+		require.NoError(t, err, "Dial")
 
-	for time.Now().Before(deadline) {
-		vals, err := redis.Values(conn.Do("CLUSTER", "SLOTS"))
-		require.NoError(t, err, "CLUSTER SLOTS")
-		if len(vals) >= expectedNodes {
-			return true
+		for time.Now().Before(deadline) {
+			vals, err := redis.Values(conn.Do("CLUSTER", "SLOTS"))
+			require.NoError(t, err, "CLUSTER SLOTS")
+			if len(vals) >= len(ports) {
+				break
+			}
+		}
+		conn.Close()
+
+		if time.Now().After(deadline) {
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 func startServerWithConfig(t *testing.T, port string, w io.Writer, conf string) *exec.Cmd {
