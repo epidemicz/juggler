@@ -2,6 +2,7 @@
 package redistest
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net"
@@ -92,13 +93,28 @@ func StartCluster(t *testing.T, w io.Writer) (func(), []string) {
 	}
 
 	// wait for the cluster to catch up
-	require.True(t, waitForCluster(t, 5*time.Second, ports...), "wait for cluster")
+	require.True(t, waitForCluster(t, 10*time.Second, ports...), "wait for cluster")
+
+	// print cluster info to output if verbose, helps debugging
+	if testing.Verbose() {
+		printClusterInfo(t, ports[0])
+	}
 
 	return func() {
 		for _, c := range cmds {
 			c.Process.Kill()
 		}
 	}, ports
+}
+
+func printClusterInfo(t *testing.T, port string) {
+	conn, err := redis.Dial("tcp", ":"+port)
+	require.NoError(t, err, "Dial to cluster node")
+	defer conn.Close()
+
+	res, err := conn.Do("CLUSTER", "INFO")
+	require.NoError(t, err, "CLUSTER INFO")
+	fmt.Println(string(res.([]byte)))
 }
 
 func setupClusterNode(t *testing.T, port, meetPort string, start, count int) {
@@ -129,11 +145,12 @@ func waitForCluster(t *testing.T, timeout time.Duration, ports ...string) bool {
 		require.NoError(t, err, "Dial")
 
 		for time.Now().Before(deadline) {
-			vals, err := redis.Values(conn.Do("CLUSTER", "SLOTS"))
-			require.NoError(t, err, "CLUSTER SLOTS")
-			if len(vals) >= len(ports) {
+			vals, err := redis.Bytes(conn.Do("CLUSTER", "INFO"))
+			require.NoError(t, err, "CLUSTER INFO")
+			if bytes.Contains(vals, []byte("cluster_state:ok")) {
 				break
 			}
+			time.Sleep(100 * time.Millisecond)
 		}
 		conn.Close()
 
