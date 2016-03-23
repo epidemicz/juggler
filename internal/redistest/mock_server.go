@@ -30,8 +30,9 @@ func StartMockServer(t *testing.T, handler func(cmd string, args ...string) inte
 	l, err := net.Listen("tcp", ":0")
 	require.NoError(t, err, "net.Listen")
 
+	_, port, _ := net.SplitHostPort(l.Addr().String())
 	s := &MockServer{
-		Addr: l.Addr().String(),
+		Addr: ":" + port,
 		done: make(chan struct{}),
 		h:    handler,
 		t:    t,
@@ -96,6 +97,8 @@ func (s *MockServer) serveConn(c net.Conn) {
 
 		// Handle the response
 		v := s.h(ar[0], ar[1:]...)
-		require.NoError(s.t, resp.Encode(c, v), "Encode")
+		if err := resp.Encode(c, v); err != nil {
+			panic(err)
+		}
 	}
 }
