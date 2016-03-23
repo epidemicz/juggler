@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/PuerkitoBio/gred/resp"
+	"github.com/PuerkitoBio/juggler/internal/redistest/resp"
 	"github.com/stretchr/testify/require"
 )
 
