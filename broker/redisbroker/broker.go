@@ -23,6 +23,7 @@ import (
 
 	"github.com/PuerkitoBio/juggler/broker"
 	"github.com/PuerkitoBio/juggler/message"
+	"github.com/PuerkitoBio/redisc"
 	"github.com/garyburd/redigo/redis"
 	"github.com/pborman/uuid"
 )
@@ -47,11 +48,13 @@ type Pool interface {
 // Broker is a broker that provides the methods to
 // interact with Redis using the juggler protocol.
 type Broker struct {
-	// Pool is the redis pool to use to get short-lived connections.
+	// Pool is the redis pool or redisc cluster to use to get
+	// short-lived connections.
 	Pool Pool
 
 	// Dial is the function to call to get a non-pooled, long-lived
-	// redis connection. Typically, it can be set to redis.Pool.Dial.
+	// redis connection. Typically, it can be set to redis.Pool.Dial
+	// or redisc.Cluster.Dial.
 	Dial func() (redis.Conn, error)
 
 	// BlockingTimeout is the time to wait for a value on calls to
@@ -78,6 +81,8 @@ type Broker struct {
 	Vars *expvar.Map
 }
 
+// script to store the call request or call result along with
+// its expiration information.
 var callOrResScript = redis.NewScript(2, `
 		redis.call("SET", KEYS[1], ARGV[1], "PX", tonumber(ARGV[1]))
 		local res = redis.call("LPUSH", KEYS[2], ARGV[2])
@@ -123,6 +128,23 @@ func registerCallOrRes(pool Pool, pld interface{}, timeout time.Duration, cap in
 	rc := pool.Get()
 	defer rc.Close()
 
+	// if it implements Bind, call it and make it a RetryConn so
+	// that it follows redirections in a cluster.
+	if bc, ok := rc.(interface {
+		Bind(...string) error
+	}); ok {
+		// if Bind fails, go on with the call as usual, but if it
+		// succeeds, try to turn it into a RetryConn.
+		if err := bc.Bind(k1, k2); err == nil {
+			retry, err := redisc.RetryConn(rc, 4, 100*time.Millisecond)
+			// again, if it fails, ignore and go on with the normal conn,
+			// but if it succeds, replace the conn with this one.
+			if err == nil {
+				rc = retry
+			}
+		}
+	}
+
 	to := int(timeout / time.Millisecond)
 	if to == 0 {
 		to = int(broker.DefaultCallTimeout / time.Millisecond)
@@ -148,6 +170,8 @@ func (b *Broker) Publish(channel string, pp *message.PubPayload) error {
 	rc := b.Pool.Get()
 	defer rc.Close()
 
+	// works just as well for a cluster connection: will pick the node
+	// for the hash of the channel (any node is ok for publish).
 	_, err = rc.Do("PUBLISH", channel, p)
 	return err
 }
