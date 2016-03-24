@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/juggler/broker"
-	"github.com/PuerkitoBio/juggler/internal/redistest"
 	"github.com/PuerkitoBio/juggler/message"
+	"github.com/PuerkitoBio/redisc/redistest"
 	"github.com/garyburd/redigo/redis"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/assert"
