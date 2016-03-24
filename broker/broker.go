@@ -30,7 +30,9 @@ type CallerBroker interface {
 // CalleeBroker defines the methods for a broker in the callee role.
 type CalleeBroker interface {
 	// NewCallsConn returns a new CallsConn that can be used to
-	// process call requests for the specified URIs.
+	// process call requests for the specified URIs. For use in
+	// a redis cluster, all URIs must belong to the same
+	// cluster slot.
 	NewCallsConn(uris ...string) (CallsConn, error)
 
 	// Result registers a call result in the broker.

@@ -14,11 +14,12 @@ import (
 
 var _ broker.CallsConn = (*callsConn)(nil)
 
+// script to delete the key and return its TTL in ms
 var delAndPTTLScript = redis.NewScript(1, `
-		local res = redis.call("PTTL", KEYS[1])
-		redis.call("DEL", KEYS[1])
-		return res
-	`)
+	local res = redis.call("PTTL", KEYS[1])
+	redis.call("DEL", KEYS[1])
+	return res
+`)
 
 type callsConn struct {
 	c       redis.Conn
@@ -54,25 +55,29 @@ func (c *callsConn) CallsErr() error {
 }
 
 // Calls returns a stream of call requests for the URIs specified when
-// creating the callsConn.
+// creating the callsConn. For use in a redis cluster, all URIs must
+// belong to the same cluster slot.
 func (c *callsConn) Calls() <-chan *message.CallPayload {
 	c.once.Do(func() {
 		c.ch = make(chan *message.CallPayload)
 
+		// compute all keys and timeout
+		keys := make([]string, len(c.uris))
+		for i, uri := range c.uris {
+			keys[i] = fmt.Sprintf(callKey, uri)
+		}
+		to := int(c.timeout / time.Second)
+		args := redis.Args{}.AddFlat(keys).Add(to)
+
+		// make the connection cluster-aware if running in a cluster
+		rc := clusterifyConn(c.c, keys...)
+
 		go func() {
 			defer close(c.ch)
 
-			// compute all keys and timeout
-			keys := make([]string, len(c.uris))
-			for i, uri := range c.uris {
-				keys[i] = fmt.Sprintf(callKey, uri)
-			}
-			to := int(c.timeout / time.Second)
-			args := redis.Args{}.AddFlat(keys).Add(to)
-
 			for {
 				// BRPOP returns array with [0]: key name, [1]: payload.
-				v, err := redis.Values(c.c.Do("BRPOP", args...))
+				v, err := redis.Values(rc.Do("BRPOP", args...))
 				if err != nil {
 					if err == redis.ErrNil {
 						// no available value
@@ -96,7 +101,7 @@ func (c *callsConn) Calls() <-chan *message.CallPayload {
 
 				// check if call is expired
 				k := fmt.Sprintf(callTimeoutKey, cp.URI, cp.MsgUUID)
-				pttl, err := redis.Int(delAndPTTLScript.Do(c.c, k))
+				pttl, err := redis.Int(delAndPTTLScript.Do(rc, k))
 				if err != nil {
 					if c.vars != nil {
 						c.vars.Add("FailedPTTLCalls", 1)

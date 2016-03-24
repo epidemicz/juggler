@@ -53,15 +53,19 @@ func (c *resultsConn) Results() <-chan *message.ResPayload {
 	c.once.Do(func() {
 		c.ch = make(chan *message.ResPayload)
 
+		// compute key and timeout
+		key := fmt.Sprintf(resKey, c.connUUID)
+		to := int(c.timeout / time.Second)
+
+		// make connection cluster-aware if running in a cluster
+		rc := clusterifyConn(c.c, key)
+
 		go func() {
 			defer close(c.ch)
 
-			// compute key and timeout
-			key := fmt.Sprintf(resKey, c.connUUID)
-			to := int(c.timeout / time.Second)
 			for {
 				// BRPOP returns array with [0]: key name, [1]: payload.
-				v, err := redis.Values(c.c.Do("BRPOP", key, to))
+				v, err := redis.Values(rc.Do("BRPOP", key, to))
 				if err != nil {
 					if err == redis.ErrNil {
 						// no available value
@@ -85,7 +89,7 @@ func (c *resultsConn) Results() <-chan *message.ResPayload {
 
 				// check if call is expired
 				k := fmt.Sprintf(resTimeoutKey, rp.ConnUUID, rp.MsgUUID)
-				pttl, err := redis.Int(delAndPTTLScript.Do(c.c, k))
+				pttl, err := redis.Int(delAndPTTLScript.Do(rc, k))
 				if err != nil {
 					if c.vars != nil {
 						c.vars.Add("FailedPTTLResults", 1)

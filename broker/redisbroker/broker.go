@@ -84,15 +84,15 @@ type Broker struct {
 // script to store the call request or call result along with
 // its expiration information.
 var callOrResScript = redis.NewScript(2, `
-		redis.call("SET", KEYS[1], ARGV[1], "PX", tonumber(ARGV[1]))
-		local res = redis.call("LPUSH", KEYS[2], ARGV[2])
-		local limit = tonumber(ARGV[3])
-		if res > limit and limit > 0 then
-			local diff = res - limit
-			redis.call("LTRIM", KEYS[2], diff, limit + diff)
-			return redis.error_reply("list capacity exceeded")
-		end
-		return res
+	redis.call("SET", KEYS[1], ARGV[1], "PX", tonumber(ARGV[1]))
+	local res = redis.call("LPUSH", KEYS[2], ARGV[2])
+	local limit = tonumber(ARGV[3])
+	if res > limit and limit > 0 then
+		local diff = res - limit
+		redis.call("LTRIM", KEYS[2], diff, limit + diff)
+		return redis.error_reply("list capacity exceeded")
+	end
+	return res
 `)
 
 const (
@@ -128,22 +128,8 @@ func registerCallOrRes(pool Pool, pld interface{}, timeout time.Duration, cap in
 	rc := pool.Get()
 	defer rc.Close()
 
-	// if it implements Bind, call it and make it a RetryConn so
-	// that it follows redirections in a cluster.
-	if bc, ok := rc.(interface {
-		Bind(...string) error
-	}); ok {
-		// if Bind fails, go on with the call as usual, but if it
-		// succeeds, try to turn it into a RetryConn.
-		if err := bc.Bind(k1, k2); err == nil {
-			retry, err := redisc.RetryConn(rc, 4, 100*time.Millisecond)
-			// again, if it fails, ignore and go on with the normal conn,
-			// but if it succeds, replace the conn with this one.
-			if err == nil {
-				rc = retry
-			}
-		}
-	}
+	// turn it into a cluster-aware RetryConn if running in a cluster
+	rc = clusterifyConn(rc, k1, k2)
 
 	to := int(timeout / time.Millisecond)
 	if to == 0 {
@@ -205,6 +191,32 @@ func (b *Broker) NewResultsConn(connUUID uuid.UUID) (broker.ResultsConn, error) 
 		return nil, err
 	}
 	return newResultsConn(rc, connUUID, b.Vars, b.BlockingTimeout, b.LogFunc), nil
+}
+
+const (
+	// TODO : make that customizable? Not super critical...
+	clusterConnMaxAttempts   = 4
+	clusterConnTryAgainDelay = 100 * time.Millisecond
+)
+
+func clusterifyConn(rc redis.Conn, keys ...string) redis.Conn {
+	// if it implements Bind, call it and make it a RetryConn so
+	// that it follows redirections in a cluster.
+	if bc, ok := rc.(interface {
+		Bind(...string) error
+	}); ok {
+		// if Bind fails, go on with the call as usual, but if it
+		// succeeds, try to turn it into a RetryConn.
+		if err := bc.Bind(keys...); err == nil {
+			retry, err := redisc.RetryConn(rc, clusterConnMaxAttempts, clusterConnTryAgainDelay)
+			// again, if it fails, ignore and go on with the normal conn,
+			// but if it succeds, replace the conn with this one.
+			if err == nil {
+				rc = retry
+			}
+		}
+	}
+	return rc
 }
 
 func logf(fn func(string, ...interface{}), f string, args ...interface{}) {
