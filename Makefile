@@ -9,8 +9,5 @@ all: $(cmds)
 $(cmds):
 	go build $(flags) ./cmd/$@ 
 
-cluster:
-	go run ./internal/start-cluster/main.go
-
 .PHONY: all $(cmds) cluster
 
