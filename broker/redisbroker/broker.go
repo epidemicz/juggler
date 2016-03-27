@@ -156,8 +156,16 @@ func (b *Broker) Publish(channel string, pp *message.PubPayload) error {
 	rc := b.Pool.Get()
 	defer rc.Close()
 
-	// works just as well for a cluster connection: will pick the node
-	// for the hash of the channel (any node is ok for publish).
+	// force selection of a random node (otherwise it would use
+	// the node of the hash of the channel - which may hit the
+	// same node over and over again if there are few channels).
+	if bc, ok := rc.(interface {
+		Bind(...string) error
+	}); ok {
+		// ignore the error, if it fails, use the connection as-is.
+		// Bind without a key selects a random node.
+		bc.Bind()
+	}
 	_, err = rc.Do("PUBLISH", channel, p)
 	return err
 }
