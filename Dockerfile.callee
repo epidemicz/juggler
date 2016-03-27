@@ -15,6 +15,7 @@ COPY        . $DIR
 # Build the callee
 RUN         go get github.com/garyburd/redigo/redis \
                 && go get github.com/pborman/uuid \
+                && go get github.com/PuerkitoBio/redisc \
                 && go build ./cmd/juggler-callee/
 
 ENTRYPOINT  ["./juggler-callee"]
