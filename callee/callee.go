@@ -7,13 +7,11 @@ package callee
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"time"
 
 	"github.com/PuerkitoBio/juggler/broker"
 	"github.com/PuerkitoBio/juggler/message"
-	"github.com/PuerkitoBio/redisc"
 )
 
 // ErrCallExpired is returned when a call is processed but the
@@ -38,26 +36,6 @@ type Callee struct {
 	// LogFunc is the logging function to use. If nil, log.Printf
 	// is used. It can be set to juggler.DiscardLog to disable logging.
 	LogFunc func(string, ...interface{})
-}
-
-// SplitByHashSlot takes a list of URIs and splits them into groups
-// of URIs belonging to the same redis cluster hash slot. URIs in
-// the same hash slot can be listened to using the same broker.CallsConn,
-// optimizing the number of redis connections.
-//
-// See the redis cluster documentation for details:
-// http://redis.io/topics/cluster-tutorial
-func SplitByHashSlot(uris []string) [][]string {
-	const callKey = "juggler:calls:{%s}" // 1: URI (copy of redisbroker/broker.go)
-
-	keys := make([]string, len(uris))
-	for i, uri := range uris {
-		keys[i] = fmt.Sprintf(callKey, uri)
-	}
-	keysBySlot := redisc.SplitBySlot(keys...)
-
-	// TODO : implement when redis-cluster package is ready
-	return nil
 }
 
 // InvokeAndStoreResult processes the provided call payload by calling
