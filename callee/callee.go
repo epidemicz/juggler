@@ -7,11 +7,13 @@ package callee
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
 	"github.com/PuerkitoBio/juggler/broker"
 	"github.com/PuerkitoBio/juggler/message"
+	"github.com/PuerkitoBio/redisc"
 )
 
 // ErrCallExpired is returned when a call is processed but the
@@ -46,6 +48,14 @@ type Callee struct {
 // See the redis cluster documentation for details:
 // http://redis.io/topics/cluster-tutorial
 func SplitByHashSlot(uris []string) [][]string {
+	const callKey = "juggler:calls:{%s}" // 1: URI (copy of redisbroker/broker.go)
+
+	keys := make([]string, len(uris))
+	for i, uri := range uris {
+		keys[i] = fmt.Sprintf(callKey, uri)
+	}
+	keysBySlot := redisc.SplitBySlot(keys...)
+
 	// TODO : implement when redis-cluster package is ready
 	return nil
 }
