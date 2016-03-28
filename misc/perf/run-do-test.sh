@@ -30,7 +30,7 @@ function badFlags {
 cmd=${1:-}
 
 # start command
-if [[ ${cmd} == "start" ]]; then
+if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
     # parse command-line flags
     ncallees=1
     nclients=100
@@ -40,6 +40,7 @@ if [[ ${cmd} == "start" ]]; then
     duration=10s
     payload=100
     timeout=1m
+    waitForStart=10s
     waitForEnd=10s
     cluster=0
 
@@ -48,12 +49,15 @@ if [[ ${cmd} == "start" ]]; then
         key=$1
 
         case $key in
-        -c|--callees)
+        -c|--callees|-C|--clients|-d|--duration|-p|--payload|-r|--rate|-t|--timeout|-u|--uris|--wait1|--wait2|-w|--workers)
             if [[ $# == 1 ]]; then
                 badFlags ${key}
             fi
-            ncallees=$2
             shift
+            ;;& # continue matching $key
+
+        -c|--callees)
+            ncallees=$1
             ;;
 
         --cluster)
@@ -61,67 +65,39 @@ if [[ ${cmd} == "start" ]]; then
             ;;
 
         -C|--clients)
-            if [[ $# == 1 ]]; then
-                badFlags ${key}
-            fi
-            nclients=$2
-            shift
+            nclients=$1
             ;;
 
         -d|--duration)
-            if [[ $# == 1 ]]; then
-                badFlags ${key}
-            fi
-            duration=$2
-            shift
+            duration=$1
             ;;
 
         -p|--payload)
-            if [[ $# == 1 ]]; then
-                badFlags ${key}
-            fi
-            payload=$2
-            shift
+            payload=$1
             ;;
 
         -r|--rate)
-            if [[ $# == 1 ]]; then
-                badFlags ${key}
-            fi
-            callRate=$2
-            shift
+            callRate=$1
             ;;
 
         -t|--timeout)
-            if [[ $# == 1 ]]; then
-                badFlags ${key}
-            fi
-            timeout=$2
-            shift
+            timeout=$1
             ;;
 
         -u|--uris)
-            if [[ $# == 1 ]]; then
-                badFlags ${key}
-            fi
-            nuris=$2
-            shift
+            nuris=$1
             ;;
 
-        --wait)
-            if [[ $# == 1 ]]; then
-                badFlags ${key}
-            fi
-            waitForEnd=$2
-            shift
+        --wait1)
+            waitForStart=$1
+            ;;
+
+        --wait2)
+            waitForEnd=$1
             ;;
 
         -w|--workers)
-            if [[ $# == 1 ]]; then
-                badFlags ${key}
-            fi
-            nworkersPerCallee=$2
-            shift
+            nworkersPerCallee=$1
             ;;
 
         *)
@@ -130,6 +106,14 @@ if [[ ${cmd} == "start" ]]; then
         esac
         shift
     done
+
+
+    if [[ ${cmd} == "debug" ]]; then
+        echo "--callees ${ncallees} --clients ${nclients} --workers ${nworkersPerCallee}" \
+            "--uris ${nuris} --rate ${callRate} --duration ${duration} --payload ${payload}" \
+            "--timeout ${timeout} --wait1 ${waitForStart} --wait2 ${waitForEnd} --cluster ${cluster}"
+        exit 199
+    fi
 
     pushd ../..
     trap finish EXIT
@@ -155,6 +139,7 @@ if [[ ${cmd} == "start" ]]; then
         --ssh-keys ${JUGGLER_DO_SSHKEY} \
         --wait
 
+    # grab the IP addresses of all droplets
     droplets=(
         "juggler-redis"
         "juggler-server"
@@ -174,13 +159,15 @@ if [[ ${cmd} == "start" ]]; then
     # start redis on the expected port and with the right config
     echo
     echo "redis IP: " ${dropletIPs["juggler-redis"]}
-    ssh -n -f root@${dropletIPs["juggler-redis"]} "sh -c 'pkill redis-server; echo 511 > /proc/sys/net/core/somaxconn; nohup redis-server --port 7000 --maxclients 100000 > /dev/null 2>&1 &'"
+    ssh -n -f root@${dropletIPs["juggler-redis"]} \
+        "sh -c 'pkill redis-server; echo 511 > /proc/sys/net/core/somaxconn; nohup redis-server --port 7000 --maxclients 100000 > /dev/null 2>&1 &'"
 
     # copy the server to juggler-server
     echo
     echo "server IP: " ${dropletIPs["juggler-server"]}
     scp -C juggler-server root@${dropletIPs["juggler-server"]}:~
-    ssh -n -f root@${dropletIPs["juggler-server"]} "sh -c 'nohup ~/juggler-server -L -redis=${dropletIPs["juggler-redis"]}:7000 > /dev/null 2>&1 &'"
+    ssh -n -f root@${dropletIPs["juggler-server"]} \
+        "sh -c 'nohup ~/juggler-server -L -redis=${dropletIPs["juggler-redis"]}:7000 > /dev/null 2>&1 &'"
 
     # copy the callee to juggler-callee
     echo
@@ -197,6 +184,15 @@ if [[ ${cmd} == "start" ]]; then
     echo
     echo "load IP: " ${dropletIPs["juggler-load"]}
     scp -C juggler-load root@${dropletIPs["juggler-load"]}:~
+
+    # run the load test
+    echo
+    echo "starting test..."
+    ssh root@${dropletIPs["juggler-load"]} \
+        "sh -c '~/juggler-load -c ${nclients} -n ${nuris} -r ${callRate} -t ${timeout} -d ${duration} -p ${payload} -delay ${waitForStart} -wait ${waitForEnd} > ~/juggler-load.out'"
+    # retrieve the results
+    scp -C root@${dropletIPs["juggler-load"]}:~/juggler-load.out ./juggler-load.out
+    echo "done."
 
     exit 0
 fi
@@ -215,7 +211,7 @@ echo "Usage: $0 [start|stop|help]"
 echo
 echo "help        -- Display this message."
 echo "start [--callees N --clients N --cluster --duration T --payload N"
-echo "       --rate T --timeout T --uris N --wait T --workers N]"
+echo "       --rate T --timeout T --uris N --wait1 T --wait2 T --workers N]"
 echo "            -- Launch droplets and run load test."
 echo "               WARNING: will charge money!"
 echo "stop        -- Destroy droplets."
