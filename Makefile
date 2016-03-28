@@ -7,7 +7,7 @@ cmds = $(addprefix juggler-, $(cmdnames))
 all: $(cmds)
 
 $(cmds):
-	go build $(flags) ./cmd/$@ 
+	go build -i $(flags) ./cmd/$@ 
 
 .PHONY: all $(cmds) cluster
 
