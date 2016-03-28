@@ -1,4 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+# WARNING : requires bash version 4+
+
 set -euo pipefail
 IFS=$'\n'
 
@@ -35,36 +38,38 @@ then
         --ssh-keys ${JUGGLER_DO_SSHKEY} \
         --wait
 
-    # start redis on the expected port and with the right config
-    dropletname=juggler-redis
-    getip='doctl compute droplet list --format PublicIPv4 --no-header ${dropletname} | head -n 1'
-    redisip=$(eval ${getip})
-    echo "redis IP: " ${redisip}
-    ssh-keygen -R ${redisip}
-    ssh -n -f -oStrictHostKeyChecking=no root@${redisip} "sh -c 'pkill redis-server; echo 511 > /proc/sys/net/core/somaxconn; nohup redis-server --port 7000 --maxclients 100000 > /dev/null 2>&1 &'"
+    droplets=(
+        "juggler-redis"
+        "juggler-server"
+        "juggler-callee"
+        "juggler-load"
+    )
+    declare -A dropletIPs
+    for droplet in ${droplets[@]}; do
+        getip='doctl compute droplet list --format PublicIPv4 --no-header ${droplet} | head -n 1'
+        ip=$(eval ${getip})
+        ssh-keygen -R ${ip}
+        # ssh-keyscan -H ${ip} >> ~/.ssh/known_hosts
+        dropletIPs[${droplet}]=${ip}
+    done
 
+    # start redis on the expected port and with the right config
+    echo "redis IP: " ${dropletIPs["juggler-redis"]}
+    ssh -n -f root@${dropletIPs["juggler-redis"]} "sh -c 'pkill redis-server; echo 511 > /proc/sys/net/core/somaxconn; nohup redis-server --port 7000 --maxclients 100000 > /dev/null 2>&1 &'"
+ 
     # copy the server to juggler-server
-    dropletname=juggler-server
-    serverip=$(eval ${getip})
-    echo "server IP: " ${serverip}
-    ssh-keygen -R ${serverip}
-    scp -C -oStrictHostKeyChecking=no juggler-server root@${serverip}:~
-    ssh -n -f root@${serverip} "sh -c 'nohup ~/juggler-server -L -redis=${redisip}:7000'"
+    echo "server IP: " ${dropletIPs["juggler-server"]}
+    scp -C juggler-server root@${dropletIPs["juggler-server"]}:~
+    ssh -n -f root@${dropletIPs["juggler-server"]} "sh -c 'nohup ~/juggler-server -L -redis=${dropletIPs["juggler-redis"]}:7000 > /dev/null 2>&1 &'"
 
     # copy the callee to juggler-callee
-    dropletname=juggler-callee
-    calleeip=$(eval ${getip})
-    echo "callee IP: " ${calleeip}
-    ssh-keygen -R ${calleeip}
-    scp -C -oStrictHostKeyChecking=no juggler-callee root@${calleeip}:~
-    ssh -n -f root@${calleeip} "sh -c 'nohup ~/juggler-callee -redis=${redisip}:7000'"
+    echo "callee IP: " ${dropletIPs["juggler-callee"]}
+    scp -C juggler-callee root@${dropletIPs["juggler-callee"]}:~
+    ssh -n -f root@${dropletIPs["juggler-callee"]} "sh -c 'nohup ~/juggler-callee -redis=${dropletIPs["juggler-redis"]}:7000 > /dev/null 2>&1 &'"
 
     # copy the load tool to juggler-load
-    dropletname=juggler-load
-    loadip=$(eval ${getip})
-    echo "load IP: " ${loadip}
-    ssh-keygen -R ${loadip}
-    scp -C -oStrictHostKeyChecking=no juggler-load root@${loadip}:~
+    echo "load IP: " ${dropletIPs["juggler-load"]}
+    scp -C juggler-load root@${dropletIPs["juggler-load"]}:~
 
     exit 0
 fi
@@ -79,6 +84,7 @@ then
 fi
 
 echo "Usage: $0 [start|stop]"
+echo "WARNING: requires bash 4+"
 echo
 echo "start       -- Launch droplets and run load test."
 echo "               WARNING: will charge money!"
