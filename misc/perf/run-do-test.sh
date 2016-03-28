@@ -21,46 +21,118 @@ function finish {
     popd
 }
 
+function badFlags {
+    echo "error: unknown or invalid option $1."
+    exit 3
+}
+
 # set cmd to $1 or an empty value if not set
 cmd=${1:-}
 
 # start command
 if [[ ${cmd} == "start" ]]; then
-    pushd ../..
-    trap finish EXIT
-
     # parse command-line flags
     ncallees=1
+    nclients=100
     nworkersPerCallee=1
     nuris=0
-    shift # the command name
+    callRate=100ms
+    duration=10s
+    payload=100
+    timeout=1m
+    waitForEnd=10s
+    cluster=0
 
-    while [[ $# > 1 ]]; do
+    shift # the command name
+    while [[ $# > 0 ]]; do
         key=$1
 
         case $key in
         -c|--callees)
+            if [[ $# == 1 ]]; then
+                badFlags ${key}
+            fi
             ncallees=$2
             shift
             ;;
 
+        --cluster)
+            cluster=1
+            ;;
+
+        -C|--clients)
+            if [[ $# == 1 ]]; then
+                badFlags ${key}
+            fi
+            nclients=$2
+            shift
+            ;;
+
+        -d|--duration)
+            if [[ $# == 1 ]]; then
+                badFlags ${key}
+            fi
+            duration=$2
+            shift
+            ;;
+
+        -p|--payload)
+            if [[ $# == 1 ]]; then
+                badFlags ${key}
+            fi
+            payload=$2
+            shift
+            ;;
+
+        -r|--rate)
+            if [[ $# == 1 ]]; then
+                badFlags ${key}
+            fi
+            callRate=$2
+            shift
+            ;;
+
+        -t|--timeout)
+            if [[ $# == 1 ]]; then
+                badFlags ${key}
+            fi
+            timeout=$2
+            shift
+            ;;
+
         -u|--uris)
+            if [[ $# == 1 ]]; then
+                badFlags ${key}
+            fi
             nuris=$2
             shift
             ;;
 
+        --wait)
+            if [[ $# == 1 ]]; then
+                badFlags ${key}
+            fi
+            waitForEnd=$2
+            shift
+            ;;
+
         -w|--workers)
+            if [[ $# == 1 ]]; then
+                badFlags ${key}
+            fi
             nworkersPerCallee=$2
             shift
             ;;
 
         *)
-            echo "error: unknown option ${key}."
-            exit 3
+            badFlags ${key}
             ;;
         esac
         shift
     done
+
+    pushd ../..
+    trap finish EXIT
 
     # build juggler for linux-amd64
     GOOS=linux GOARCH=amd64 make
@@ -103,7 +175,7 @@ if [[ ${cmd} == "start" ]]; then
     echo
     echo "redis IP: " ${dropletIPs["juggler-redis"]}
     ssh -n -f root@${dropletIPs["juggler-redis"]} "sh -c 'pkill redis-server; echo 511 > /proc/sys/net/core/somaxconn; nohup redis-server --port 7000 --maxclients 100000 > /dev/null 2>&1 &'"
- 
+
     # copy the server to juggler-server
     echo
     echo "server IP: " ${dropletIPs["juggler-server"]}
@@ -142,7 +214,8 @@ fi
 echo "Usage: $0 [start|stop|help]"
 echo
 echo "help        -- Display this message."
-echo "start [--callees N --uris N --workers N]"
+echo "start [--callees N --clients N --cluster --duration T --payload N"
+echo "       --rate T --timeout T --uris N --wait T --workers N]"
 echo "            -- Launch droplets and run load test."
 echo "               WARNING: will charge money!"
 echo "stop        -- Destroy droplets."
