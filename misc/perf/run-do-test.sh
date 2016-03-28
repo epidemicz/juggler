@@ -43,6 +43,7 @@ if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
     waitForStart=10s
     waitForEnd=10s
     cluster=0
+    noDroplet=0
 
     shift # the command name
     while [[ $# > 0 ]]; do
@@ -70,6 +71,10 @@ if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
 
         -d|--duration)
             duration=$1
+            ;;
+
+        -D|--no-droplet)
+            noDroplet=1
             ;;
 
         -p|--payload)
@@ -111,7 +116,8 @@ if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
     if [[ ${cmd} == "debug" ]]; then
         echo "--callees ${ncallees} --clients ${nclients} --workers ${nworkersPerCallee}" \
             "--uris ${nuris} --rate ${callRate} --duration ${duration} --payload ${payload}" \
-            "--timeout ${timeout} --wait1 ${waitForStart} --wait2 ${waitForEnd} --cluster ${cluster}"
+            "--timeout ${timeout} --wait1 ${waitForStart} --wait2 ${waitForEnd}" \
+            "--no-droplet ${noDroplet} --cluster ${cluster}"
         exit 199
     fi
 
@@ -121,23 +127,25 @@ if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
     # build juggler for linux-amd64
     GOOS=linux GOARCH=amd64 make
 
-    # create the redis droplet
-    doctl compute droplet create \
-        juggler-redis \
-        --image redis \
-        --region ${JUGGLER_DO_REGION} \
-        --size ${JUGGLER_DO_SIZE} \
-        --ssh-keys ${JUGGLER_DO_SSHKEY} \
-        --wait
+    if [[ ${noDroplet} == 0 ]]; then
+        # create the redis droplet
+        doctl compute droplet create \
+            juggler-redis \
+            --image redis \
+            --region ${JUGGLER_DO_REGION} \
+            --size ${JUGGLER_DO_SIZE} \
+            --ssh-keys ${JUGGLER_DO_SSHKEY} \
+            --wait
 
-    # create the client, callee and server droplet
-    doctl compute droplet create \
-        juggler-server juggler-callee juggler-load \
-        --image ubuntu-14-04-x64 \
-        --region ${JUGGLER_DO_REGION} \
-        --size ${JUGGLER_DO_SIZE} \
-        --ssh-keys ${JUGGLER_DO_SSHKEY} \
-        --wait
+        # create the client, callee and server droplet
+        doctl compute droplet create \
+            juggler-server juggler-callee juggler-load \
+            --image ubuntu-14-04-x64 \
+            --region ${JUGGLER_DO_REGION} \
+            --size ${JUGGLER_DO_SIZE} \
+            --ssh-keys ${JUGGLER_DO_SSHKEY} \
+            --wait
+    fi
 
     # grab the IP addresses of all droplets
     droplets=(
@@ -150,10 +158,17 @@ if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
     for droplet in ${droplets[@]}; do
         getip='doctl compute droplet list --format PublicIPv4 --no-header ${droplet} | head -n 1'
         ip=$(eval ${getip})
+
+        if [[ ${ip} == "" ]]; then
+            echo "error: missing droplet ${droplet}."
+            exit 4
+        fi
+
         ssh-keygen -R ${ip}
         # keyscan doesn't work reliably for some reason, adds only the redis one?
         ssh-keyscan -t ecdsa ${ip} >> ${HOME}/.ssh/known_hosts
         dropletIPs[${droplet}]=${ip}
+        sleep .1
     done
 
     # start redis on the expected port and with the right config
@@ -189,7 +204,7 @@ if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
     echo
     echo "starting test..."
     ssh root@${dropletIPs["juggler-load"]} \
-        "sh -c '~/juggler-load -c ${nclients} -n ${nuris} -r ${callRate} -t ${timeout} -d ${duration} -p ${payload} -delay ${waitForStart} -wait ${waitForEnd} > ~/juggler-load.out'"
+        "sh -c '~/juggler-load -addr=ws://${dropletIPs["juggler-server"]}:9000/ws -c ${nclients} -n ${nuris} -r ${callRate} -t ${timeout} -d ${duration} -p ${payload} -delay ${waitForStart} -w ${waitForEnd} > ~/juggler-load.out'"
     # retrieve the results
     scp -C root@${dropletIPs["juggler-load"]}:~/juggler-load.out ./juggler-load.out
     echo "done."
@@ -210,7 +225,7 @@ fi
 echo "Usage: $0 [start|stop|help]"
 echo
 echo "help        -- Display this message."
-echo "start [--callees N --clients N --cluster --duration T --payload N"
+echo "start [--callees N --clients N --cluster --duration T --no-droplet --payload N"
 echo "       --rate T --timeout T --uris N --wait1 T --wait2 T --workers N]"
 echo "            -- Launch droplets and run load test."
 echo "               WARNING: will charge money!"
