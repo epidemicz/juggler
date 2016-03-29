@@ -9,3 +9,4 @@ Tests have been run on Digital Ocean droplets running Ubuntu 14.04.4 64-bit, 512
 
 Redis, the juggler-server and the juggler-callees were stopped and restarted before each test.
 
+The `run-do-test.sh` bash script can be used to automate running the load tests.

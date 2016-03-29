@@ -168,18 +168,21 @@ if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
         # keyscan doesn't work reliably for some reason, adds only the redis one?
         ssh-keyscan -t ecdsa ${ip} >> ${HOME}/.ssh/known_hosts
         dropletIPs[${droplet}]=${ip}
-        sleep .1
+        sleep 1
     done
 
     # start redis on the expected port and with the right config
     echo
     echo "redis IP: " ${dropletIPs["juggler-redis"]}
+    ssh root@${dropletIPs["juggler-redis"]} \
+        "sh -c 'pkill redis-server; echo 511 > /proc/sys/net/core/somaxconn'"
     ssh -n -f root@${dropletIPs["juggler-redis"]} \
-        "sh -c 'pkill redis-server; echo 511 > /proc/sys/net/core/somaxconn; nohup redis-server --port 7000 --maxclients 100000 > /dev/null 2>&1 &'"
+        "sh -c 'nohup redis-server --port 7000 --maxclients 100000 > /dev/null 2>&1 &'"
 
     # copy the server to juggler-server
     echo
     echo "server IP: " ${dropletIPs["juggler-server"]}
+    ssh -n -f root@${dropletIPs["juggler-server"]} "sh -c 'pkill juggler-server'"
     scp -C juggler-server root@${dropletIPs["juggler-server"]}:~
     ssh -n -f root@${dropletIPs["juggler-server"]} \
         "sh -c 'nohup ~/juggler-server -L -redis=${dropletIPs["juggler-redis"]}:7000 > /dev/null 2>&1 &'"
@@ -187,6 +190,7 @@ if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
     # copy the callee to juggler-callee
     echo
     echo "callee IP: " ${dropletIPs["juggler-callee"]}
+    ssh -n -f root@${dropletIPs["juggler-callee"]} "sh -c 'pkill juggler-callee'"
     scp -C juggler-callee root@${dropletIPs["juggler-callee"]}:~
 
     # start ncallees with nworkersPerCallee each
@@ -205,8 +209,10 @@ if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
     echo "starting test..."
     ssh root@${dropletIPs["juggler-load"]} \
         "sh -c '~/juggler-load -addr=ws://${dropletIPs["juggler-server"]}:9000/ws -c ${nclients} -n ${nuris} -r ${callRate} -t ${timeout} -d ${duration} -p ${payload} -delay ${waitForStart} -w ${waitForEnd} > ~/juggler-load.out'"
+
     # retrieve the results
-    scp -C root@${dropletIPs["juggler-load"]}:~/juggler-load.out ./juggler-load.out
+    outfile="misc/perf/$(date +'%Y-%m-%d_%H:%M')-c=${ncallees}-C=${nclients}-d${duration}-p${payload}-r${callRate}-t${timeout}-u${nuris}-w${nworkersPerCallee}-w1${waitForStart}-w2${waitForEnd}-cluster${cluster}"
+    scp -C root@${dropletIPs["juggler-load"]}:~/juggler-load.out ${outfile}
     echo "done."
 
     exit 0
