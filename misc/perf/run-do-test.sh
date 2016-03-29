@@ -211,7 +211,7 @@ if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
         "sh -c '~/juggler-load -addr=ws://${dropletIPs["juggler-server"]}:9000/ws -c ${nclients} -n ${nuris} -r ${callRate} -t ${timeout} -d ${duration} -p ${payload} -delay ${waitForStart} -w ${waitForEnd} > ~/juggler-load.out'"
 
     # retrieve the results
-    outfile="misc/perf/$(date +'%Y-%m-%d_%H:%M')-c=${ncallees}-C=${nclients}-d${duration}-p${payload}-r${callRate}-t${timeout}-u${nuris}-w${nworkersPerCallee}-w1${waitForStart}-w2${waitForEnd}-cluster${cluster}"
+    outfile="misc/perf/$(date +'%Y-%m-%d_%H:%M')-c=${ncallees}-C=${nclients}-d${duration}-p${payload}-r${callRate}-t${timeout}-u${nuris}-w${nworkersPerCallee}-w1${waitForStart}-w2${waitForEnd}-cluster${cluster}-${JUGGLER_DO_SIZE}"
     scp -C root@${dropletIPs["juggler-load"]}:~/juggler-load.out ${outfile}
     echo "done."
 
