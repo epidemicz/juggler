@@ -21,6 +21,7 @@ import (
 	"github.com/PuerkitoBio/juggler/broker/redisbroker"
 	"github.com/PuerkitoBio/juggler/callee"
 	"github.com/PuerkitoBio/juggler/message"
+	"github.com/PuerkitoBio/redisc"
 	"github.com/garyburd/redigo/redis"
 )
 
@@ -29,8 +30,9 @@ var (
 	brokerResultCapFlag       = flag.Int("broker-result-cap", 0, "Capacity of the `results` queue.")
 	helpFlag                  = flag.Bool("help", false, "Show help.")
 	numDelayURIsFlag          = flag.Int("n", 0, "Number of test.delay `URIs`.")
-	redisAddrFlag             = flag.String("redis", ":6379", "Redis `address`.")
 	httpServerPortFlag        = flag.Int("port", 9001, "HTTP server `port` to serve debug endpoints.")
+	redisAddrFlag             = flag.String("redis", ":6379", "Redis `address`.")
+	redisClusterFlag          = flag.Bool("redis-cluster", false, "Use redis cluster.")
 	redisPoolIdleTimeoutFlag  = flag.Duration("redis-idle-timeout", 0, "Redis idle connection `timeout`.")
 	redisPoolMaxActiveFlag    = flag.Int("redis-max-active", 0, "Maximum active redis `connections`.")
 	redisPoolMaxIdleFlag      = flag.Int("redis-max-idle", 0, "Maximum idle redis `connections`.")
@@ -57,8 +59,17 @@ func main() {
 		uris["test.delay."+strconv.Itoa(i)] = delayThunk
 	}
 
-	pool := newRedisPool(*redisAddrFlag)
-	c := &callee.Callee{Broker: newBroker(pool)}
+	var pool redisbroker.Pool
+	var dial func() (redis.Conn, error)
+
+	if *redisClusterFlag {
+		cluster := newRedisCluster(*redisAddrFlag)
+		pool, dial = cluster, cluster.Dial
+	} else {
+		p, _ := newRedisPool(*redisAddrFlag)
+		pool, dial = p, p.Dial
+	}
+	c := &callee.Callee{Broker: newBroker(pool, dial)}
 
 	vars := expvar.NewMap("callee")
 
@@ -74,6 +85,7 @@ func main() {
 		keys = append(keys, k)
 	}
 
+	// TODO : split by slot in cluster mode...
 	cc, err := c.Broker.NewCallsConn(keys...)
 	if err != nil {
 		log.Fatalf("Calls failed: %v", err)
@@ -167,16 +179,23 @@ func echo(s string) string {
 	return s
 }
 
-func newBroker(pool *redis.Pool) broker.CalleeBroker {
+func newBroker(pool redisbroker.Pool, dial func() (redis.Conn, error)) broker.CalleeBroker {
 	return &redisbroker.Broker{
 		Pool:            pool,
-		Dial:            pool.Dial,
+		Dial:            dial,
 		BlockingTimeout: *brokerBlockingTimeoutFlag,
 		ResultCap:       *brokerResultCapFlag,
 	}
 }
 
-func newRedisPool(addr string) *redis.Pool {
+func newRedisCluster(addr string) *redisc.Cluster {
+	return &redisc.Cluster{
+		StartupNodes: []string{addr},
+		CreatePool:   newRedisPool,
+	}
+}
+
+func newRedisPool(addr string, opts ...redis.DialOption) (*redis.Pool, error) {
 	return &redis.Pool{
 		MaxIdle:     *redisPoolMaxIdleFlag,
 		MaxActive:   *redisPoolMaxActiveFlag,
@@ -192,5 +211,5 @@ func newRedisPool(addr string) *redis.Pool {
 			_, err := c.Do("PING")
 			return err
 		},
-	}
+	}, nil
 }
