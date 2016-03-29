@@ -85,42 +85,50 @@ func main() {
 		keys = append(keys, k)
 	}
 
-	// TODO : split by slot in cluster mode...
-	cc, err := c.Broker.NewCallsConn(keys...)
-	if err != nil {
-		log.Fatalf("Calls failed: %v", err)
+	// split by slot in cluster mode
+	keysPerSlot := [][]string{keys}
+	if *redisClusterFlag {
+		keysPerSlot = redisc.SplitBySlot(keys...)
 	}
-	defer cc.Close()
 
+	// start n workers for each cluster slot
 	wg := sync.WaitGroup{}
-	wg.Add(*workersFlag)
-	for i := 0; i < *workersFlag; i++ {
-		go func() {
-			defer wg.Done()
+	for _, keys := range keysPerSlot {
+		cc, err := c.Broker.NewCallsConn(keys...)
+		if err != nil {
+			log.Fatalf("Calls failed: %v", err)
+		}
+		defer cc.Close()
 
-			ch := cc.Calls()
-			for cp := range ch {
-				log.Printf("received request %v %s", cp.MsgUUID, cp.URI)
-				vars.Add("Requests", 1)
-				vars.Add("Requests."+cp.URI, 1)
+		wg.Add(*workersFlag)
+		for i := 0; i < *workersFlag; i++ {
+			go func() {
+				defer wg.Done()
 
-				if err := c.InvokeAndStoreResult(cp, uris[cp.URI]); err != nil {
-					if err != callee.ErrCallExpired {
-						log.Printf("InvokeAndStoreResult failed: %v", err)
-						vars.Add("Failed", 1)
-						vars.Add("Failed."+cp.URI, 1)
+				ch := cc.Calls()
+				for cp := range ch {
+					log.Printf("received request %v %s", cp.MsgUUID, cp.URI)
+					vars.Add("Requests", 1)
+					vars.Add("Requests."+cp.URI, 1)
+
+					if err := c.InvokeAndStoreResult(cp, uris[cp.URI]); err != nil {
+						if err != callee.ErrCallExpired {
+							log.Printf("InvokeAndStoreResult failed: %v", err)
+							vars.Add("Failed", 1)
+							vars.Add("Failed."+cp.URI, 1)
+							continue
+						}
+						log.Printf("expired request %v %s", cp.MsgUUID, cp.URI)
+						vars.Add("Expired", 1)
+						vars.Add("Expired."+cp.URI, 1)
 						continue
 					}
-					log.Printf("expired request %v %s", cp.MsgUUID, cp.URI)
-					vars.Add("Expired", 1)
-					vars.Add("Expired."+cp.URI, 1)
-					continue
+					log.Printf("sent result %v %s", cp.MsgUUID, cp.URI)
+					vars.Add("Succeeded", 1)
+					vars.Add("Succeded."+cp.URI, 1)
 				}
-				log.Printf("sent result %v %s", cp.MsgUUID, cp.URI)
-				vars.Add("Succeeded", 1)
-				vars.Add("Succeded."+cp.URI, 1)
-			}
-		}()
+			}()
+		}
 	}
 	wg.Wait()
 }
