@@ -20,6 +20,7 @@ import (
 	"github.com/PuerkitoBio/juggler/broker"
 	"github.com/PuerkitoBio/juggler/broker/redisbroker"
 	"github.com/PuerkitoBio/juggler/message"
+	"github.com/PuerkitoBio/redisc"
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/websocket"
 )
@@ -31,6 +32,7 @@ var (
 	noLogFlag           = flag.Bool("L", false, "Disable logging.")
 	portFlag            = flag.Int("port", 9000, "Server `port`.")
 	redisAddrFlag       = flag.String("redis", ":6379", "Redis `address`.")
+	redisClusterFlag    = flag.Bool("redis-cluster", false, "Use redis cluster.")
 )
 
 func main() {
@@ -47,6 +49,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	// TODO : support redis-cluster via the config file
+
 	if err := checkRedisConfig(conf.Redis); err != nil {
 		fmt.Fprintf(os.Stderr, "invalid redis configuration: %v\n", err)
 		flag.Usage()
@@ -59,19 +63,51 @@ func main() {
 	}
 
 	// create pool, brokers, server, upgrader, HTTP server
-	var poolp, poolc *redis.Pool
+	var poolp, poolc redisbroker.Pool
+	var dialp, dialc func() (redis.Conn, error)
+
 	if conf.Redis.Addr != "" {
-		pool := newRedisPool(conf.Redis)
-		poolp, poolc = pool, pool
-		logFn("redis pool configured on %s", conf.Redis.Addr)
+		createPoolFn := redisPoolCreateFunc(conf.Redis)
+		if *redisClusterFlag {
+			cluster, err := newRedisCluster(conf.Redis.Addr, createPoolFn)
+			if err != nil {
+				log.Fatalf("failed to connect to redis cluster: %v", err)
+			}
+			poolp, poolc = cluster, cluster
+			dialp, dialc = cluster.Dial, cluster.Dial
+			logFn("redis cluster configured on %s", conf.Redis.Addr)
+		} else {
+			pool, err := createPoolFn(conf.Redis.Addr)
+			if err != nil {
+				log.Fatalf("failed to connect to redis pool: %v", err)
+			}
+			poolp, poolc = pool, pool
+			dialp, dialc = pool.Dial, pool.Dial
+			logFn("redis pool configured on %s", conf.Redis.Addr)
+		}
 	} else {
-		poolp = newRedisPool(conf.Redis.PubSub)
-		poolc = newRedisPool(conf.Redis.Caller)
+		if *redisClusterFlag {
+			fmt.Fprintln(os.Stderr, "cannot use redis cluster with different pubsub and caller configuration.")
+			flag.Usage()
+			os.Exit(4)
+		}
+
+		pp, err1 := redisPoolCreateFunc(conf.Redis.PubSub)(conf.Redis.PubSub.Addr)
+		pc, err2 := redisPoolCreateFunc(conf.Redis.Caller)(conf.Redis.Caller.Addr)
+		if err1 != nil || err2 != nil {
+			err := err1
+			if err1 == nil {
+				err = err2
+			}
+			log.Fatalf("failed to connect to redis pool: %v", err)
+		}
+		poolp, poolc = pp, pc
+		dialp, dialc = pp.Dial, pc.Dial
 		logFn("redis pool configured on %s (pubsub) and %s (caller)", conf.Redis.PubSub.Addr, conf.Redis.Caller.Addr)
 	}
 
-	psb := newPubSubBroker(poolp, logFn)
-	cb := newCallerBroker(conf.CallerBroker, poolc, logFn)
+	psb := newPubSubBroker(poolp, dialp, logFn)
+	cb := newCallerBroker(conf.CallerBroker, poolc, dialc, logFn)
 
 	srv := newServer(conf.Server, psb, cb, logFn)
 	srv.Handler = newHandler(conf.Server, logFn)
@@ -132,18 +168,18 @@ func newHandler(conf *Server, logFn func(string, ...interface{})) juggler.Handle
 		juggler.Chain(chain...))
 }
 
-func newPubSubBroker(pool *redis.Pool, logFn func(string, ...interface{})) broker.PubSubBroker {
+func newPubSubBroker(pool redisbroker.Pool, dial func() (redis.Conn, error), logFn func(string, ...interface{})) broker.PubSubBroker {
 	return &redisbroker.Broker{
 		Pool:    pool,
-		Dial:    pool.Dial,
+		Dial:    dial,
 		LogFunc: logFn,
 	}
 }
 
-func newCallerBroker(conf *CallerBroker, pool *redis.Pool, logFn func(string, ...interface{})) broker.CallerBroker {
+func newCallerBroker(conf *CallerBroker, pool redisbroker.Pool, dial func() (redis.Conn, error), logFn func(string, ...interface{})) broker.CallerBroker {
 	return &redisbroker.Broker{
 		Pool:            pool,
-		Dial:            pool.Dial,
+		Dial:            dial,
 		BlockingTimeout: conf.BlockingTimeout,
 		CallCap:         conf.CallCap,
 		LogFunc:         logFn,
@@ -208,32 +244,41 @@ func newServer(conf *Server, pubSub broker.PubSubBroker, caller broker.CallerBro
 	}
 }
 
-func newRedisPool(conf *Redis) *redis.Pool {
-	addr := conf.Addr
-	p := &redis.Pool{
-		MaxIdle:     conf.MaxIdle,
-		MaxActive:   conf.MaxActive,
-		IdleTimeout: conf.IdleTimeout,
-		Dial: func() (redis.Conn, error) {
-			c, err := redis.Dial("tcp", addr)
-			if err != nil {
-				return nil, err
-			}
-			return c, err
-		},
-		TestOnBorrow: func(c redis.Conn, t time.Time) error {
-			_, err := c.Do("PING")
-			return err
-		},
+func newRedisCluster(addr string, createPool func(string, ...redis.DialOption) (*redis.Pool, error)) (*redisc.Cluster, error) {
+	c := &redisc.Cluster{
+		StartupNodes: []string{addr},
+		CreatePool:   createPool,
 	}
+	err := c.Refresh()
+	return c, err
+}
 
-	// test the connection so that it fails fast if redis is not available
-	c := p.Get()
-	defer c.Close()
+func redisPoolCreateFunc(conf *Redis) func(string, ...redis.DialOption) (*redis.Pool, error) {
+	return func(addr string, opts ...redis.DialOption) (*redis.Pool, error) {
+		p := &redis.Pool{
+			MaxIdle:     conf.MaxIdle,
+			MaxActive:   conf.MaxActive,
+			IdleTimeout: conf.IdleTimeout,
+			Dial: func() (redis.Conn, error) {
+				c, err := redis.Dial("tcp", addr, opts...)
+				if err != nil {
+					return nil, err
+				}
+				return c, err
+			},
+			TestOnBorrow: func(c redis.Conn, t time.Time) error {
+				_, err := c.Do("PING")
+				return err
+			},
+		}
 
-	if _, err := c.Do("PING"); err != nil {
-		log.Fatalf("redis PING failed: %v", err)
+		// test the connection so that it fails fast if redis is not available
+		c := p.Get()
+		defer c.Close()
+
+		if _, err := c.Do("PING"); err != nil {
+			return nil, err
+		}
+		return p, nil
 	}
-
-	return p
 }
