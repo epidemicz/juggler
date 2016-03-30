@@ -35,10 +35,25 @@ function dropletNames {
     fi
 }
 
+function dropletIPAddrs {
+    for i in $(seq 2 $#); do
+        dropletName=${!i}
+
+        getip='doctl compute droplet list --format PublicIPv4 --no-header ${dropletName} | head -n 1'
+        ip=$(eval ${getip})
+
+        if [[ ${ip} == "" ]]; then
+            echo "error: missing droplet ${dropletName}."
+            exit 4
+        fi
+        eval "$1[${dropletName}]=${ip}"
+    done
+}
+
 # set cmd to $1 or an empty value if not set
 cmd=${1:-}
 
-# up command
+# up command : create the droplets
 if [[ ${cmd} == "up" ]]; then
     # parse command-line flags
     cluster=0
@@ -86,12 +101,26 @@ if [[ ${cmd} == "up" ]]; then
     declare -a droplets
     declare -A dropletIPs
     dropletNames ${cluster} droplets
+    dropletIPAddrs dropletIPs ${droplets[@]}
 
     if [[ ${debug} == 1 ]]; then
         for droplet in ${droplets[@]}; do
             echo ${droplet}
         done
+        for key in ${!dropletIPs[@]}; do
+            echo ${key} ${dropletIPs[${key}]}
+        done
+        exit 199
     fi
+
+    # update the known_host file
+    for ip in ${dropletIPs[@]}; do
+        ssh-keygen -R ${ip}
+        sleep .1
+        # keyscan doesn't work reliably for some reason?
+        ssh-keyscan -t ecdsa ${ip} >> ${HOME}/.ssh/known_hosts
+        sleep .1
+    done
 
     exit 0
 fi
@@ -107,7 +136,7 @@ if [[ ${cmd} == "make" ]]; then
 fi
 
 # start command
-if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
+if [[ ${cmd} == "start" ]]; then
     # parse command-line flags
     ncallees=1
     nclients=100
@@ -120,6 +149,7 @@ if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
     waitForStart=10s
     waitForEnd=10s
     cluster=0
+    debug=0
 
     shift # the command name
     while [[ $# > 0 ]]; do
@@ -143,6 +173,10 @@ if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
 
         -C|--clients)
             nclients=$1
+            ;;
+
+        --debug)
+            debug=1
             ;;
 
         -d|--duration)
@@ -185,7 +219,7 @@ if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
     done
 
 
-    if [[ ${cmd} == "debug" ]]; then
+    if [[ ${debug} == 1 ]]; then
         echo "--callees ${ncallees} --clients ${nclients} --workers ${nworkersPerCallee}" \
             "--uris ${nuris} --rate ${callRate} --duration ${duration} --payload ${payload}" \
             "--timeout ${timeout} --wait1 ${waitForStart} --wait2 ${waitForEnd}" \
@@ -268,8 +302,8 @@ if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
     exit 0
 fi
 
-# stop command
-if [[ ${cmd} == "stop" ]]; then
+# down command : destroy droplets
+if [[ ${cmd} == "down" ]]; then
     ids=$(doctl compute droplet list juggler-* --no-header --format ID)
     for id in ${ids}; do
         doctl compute droplet delete ${id}
