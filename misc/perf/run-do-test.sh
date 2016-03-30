@@ -17,7 +17,7 @@ fi
 set -euo pipefail
 IFS=$'\n'
 
-function finish {
+function popdir {
     popd
 }
 
@@ -26,8 +26,85 @@ function badFlags {
     exit 3
 }
 
+function dropletNames {
+    eval "$2+=(juggler-server juggler-callee juggler-load)"
+    if [[ $1 == 1 ]]; then
+        eval "$2+=(juggler-redis1 juggler-redis2 juggler-redis2)"
+    else
+        eval "$2+=(juggler-redis)"
+    fi
+}
+
 # set cmd to $1 or an empty value if not set
 cmd=${1:-}
+
+# up command
+if [[ ${cmd} == "up" ]]; then
+    # parse command-line flags
+    cluster=0
+    debug=0
+    shift # the command name
+    while [[ $# > 0 ]]; do
+        key=$1
+
+        case $key in
+        --cluster)
+            cluster=1
+            ;;
+
+        --debug)
+            debug=1
+            ;;
+
+        *)
+            badFlags ${key}
+            ;;
+        esac
+        shift
+    done
+
+    if [[ ${debug} == 0 ]]; then
+        # create the redis droplet
+        doctl compute droplet create \
+            juggler-redis \
+            --image redis \
+            --region ${JUGGLER_DO_REGION} \
+            --size ${JUGGLER_DO_SIZE} \
+            --ssh-keys ${JUGGLER_DO_SSHKEY} \
+            --wait
+
+        # create the client, callee and server droplet
+        doctl compute droplet create \
+            juggler-server juggler-callee juggler-load \
+            --image ubuntu-14-04-x64 \
+            --region ${JUGGLER_DO_REGION} \
+            --size ${JUGGLER_DO_SIZE} \
+            --ssh-keys ${JUGGLER_DO_SSHKEY} \
+            --wait
+    fi
+
+    declare -a droplets
+    declare -A dropletIPs
+    dropletNames ${cluster} droplets
+
+    if [[ ${debug} == 1 ]]; then
+        for droplet in ${droplets[@]}; do
+            echo ${droplet}
+        done
+    fi
+
+    exit 0
+fi
+
+# make command
+if [[ ${cmd} == "make" ]]; then
+    pushd ../..
+    trap popdir EXIT
+
+    # build juggler for linux-amd64
+    GOOS=linux GOARCH=amd64 make
+    exit 0
+fi
 
 # start command
 if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
@@ -43,7 +120,6 @@ if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
     waitForStart=10s
     waitForEnd=10s
     cluster=0
-    noDroplet=0
 
     shift # the command name
     while [[ $# > 0 ]]; do
@@ -71,10 +147,6 @@ if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
 
         -d|--duration)
             duration=$1
-            ;;
-
-        -D|--no-droplet)
-            noDroplet=1
             ;;
 
         -p|--payload)
@@ -117,35 +189,12 @@ if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
         echo "--callees ${ncallees} --clients ${nclients} --workers ${nworkersPerCallee}" \
             "--uris ${nuris} --rate ${callRate} --duration ${duration} --payload ${payload}" \
             "--timeout ${timeout} --wait1 ${waitForStart} --wait2 ${waitForEnd}" \
-            "--no-droplet ${noDroplet} --cluster ${cluster}"
+            "--cluster ${cluster}"
         exit 199
     fi
 
     pushd ../..
-    trap finish EXIT
-
-    # build juggler for linux-amd64
-    GOOS=linux GOARCH=amd64 make
-
-    if [[ ${noDroplet} == 0 ]]; then
-        # create the redis droplet
-        doctl compute droplet create \
-            juggler-redis \
-            --image redis \
-            --region ${JUGGLER_DO_REGION} \
-            --size ${JUGGLER_DO_SIZE} \
-            --ssh-keys ${JUGGLER_DO_SSHKEY} \
-            --wait
-
-        # create the client, callee and server droplet
-        doctl compute droplet create \
-            juggler-server juggler-callee juggler-load \
-            --image ubuntu-14-04-x64 \
-            --region ${JUGGLER_DO_REGION} \
-            --size ${JUGGLER_DO_SIZE} \
-            --ssh-keys ${JUGGLER_DO_SSHKEY} \
-            --wait
-    fi
+    trap popdir EXIT
 
     # grab the IP addresses of all droplets
     droplets=(
@@ -165,10 +214,11 @@ if [[ ${cmd} == "start" ]] || [[ ${cmd} == "debug" ]]; then
         fi
 
         ssh-keygen -R ${ip}
-        # keyscan doesn't work reliably for some reason, adds only the redis one?
+        sleep .1
+        # keyscan doesn't work reliably for some reason?
         ssh-keyscan -t ecdsa ${ip} >> ${HOME}/.ssh/known_hosts
+        sleep .1
         dropletIPs[${droplet}]=${ip}
-        sleep 1
     done
 
     # start redis on the expected port and with the right config
