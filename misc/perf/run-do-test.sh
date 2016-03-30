@@ -29,7 +29,7 @@ function badFlags {
 function dropletNames {
     eval "$2+=(juggler-server juggler-callee juggler-load)"
     if [[ $1 == 1 ]]; then
-        eval "$2+=(juggler-redis1 juggler-redis2 juggler-redis2)"
+        eval "$2+=(juggler-redis1 juggler-redis2 juggler-redis3)"
     else
         eval "$2+=(juggler-redis)"
     fi
@@ -79,14 +79,20 @@ if [[ ${cmd} == "up" ]]; then
     done
 
     if [[ ${debug} == 0 ]]; then
-        # create the redis droplet
-        doctl compute droplet create \
-            juggler-redis \
-            --image redis \
-            --region ${JUGGLER_DO_REGION} \
-            --size ${JUGGLER_DO_SIZE} \
-            --ssh-keys ${JUGGLER_DO_SSHKEY} \
-            --wait
+        redisName=(juggler-redis)
+        if [[ ${cluster} == 1 ]]; then
+            redisName=(juggler-redis1 juggler-redis2 juggler-redis3)
+        fi
+        for name in ${redisName[@]}; do
+            # create the redis droplet(s)
+            doctl compute droplet create \
+                ${name} \
+                --image redis \
+                --region ${JUGGLER_DO_REGION} \
+                --size ${JUGGLER_DO_SIZE} \
+                --ssh-keys ${JUGGLER_DO_SSHKEY} \
+                --wait
+        done
 
         # create the client, callee and server droplet
         doctl compute droplet create \
@@ -135,8 +141,8 @@ if [[ ${cmd} == "make" ]]; then
     exit 0
 fi
 
-# start command
-if [[ ${cmd} == "start" ]]; then
+# run command : run the load test
+if [[ ${cmd} == "run" ]]; then
     # parse command-line flags
     ncallees=1
     nclients=100
@@ -218,44 +224,33 @@ if [[ ${cmd} == "start" ]]; then
         shift
     done
 
+    # grab the IP addresses of all droplets
+    declare -a droplets
+    declare -A dropletIPs
+    dropletNames ${cluster} droplets
+    dropletIPAddrs dropletIPs ${droplets[@]}
 
     if [[ ${debug} == 1 ]]; then
-        echo "--callees ${ncallees} --clients ${nclients} --workers ${nworkersPerCallee}" \
-            "--uris ${nuris} --rate ${callRate} --duration ${duration} --payload ${payload}" \
-            "--timeout ${timeout} --wait1 ${waitForStart} --wait2 ${waitForEnd}" \
-            "--cluster ${cluster}"
+        echo "--callees ${ncallees} --clients ${nclients} --cluster ${cluster} " \
+            "--duration ${duration} --payload ${payload} --rate ${callRate} " \
+            "--timeout ${timeout} --uris ${nuris} --wait1 ${waitForStart} --wait2 ${waitForEnd}" \
+            "--workers ${nworkersPerCallee}"
+
+        for droplet in ${droplets[@]}; do
+            echo ${droplet}
+        done
+        for key in ${!dropletIPs[@]}; do
+            echo ${key} ${dropletIPs[${key}]}
+        done
+
         exit 199
     fi
 
     pushd ../..
     trap popdir EXIT
 
-    # grab the IP addresses of all droplets
-    droplets=(
-        "juggler-redis"
-        "juggler-server"
-        "juggler-callee"
-        "juggler-load"
-    )
-    declare -A dropletIPs
-    for droplet in ${droplets[@]}; do
-        getip='doctl compute droplet list --format PublicIPv4 --no-header ${droplet} | head -n 1'
-        ip=$(eval ${getip})
-
-        if [[ ${ip} == "" ]]; then
-            echo "error: missing droplet ${droplet}."
-            exit 4
-        fi
-
-        ssh-keygen -R ${ip}
-        sleep .1
-        # keyscan doesn't work reliably for some reason?
-        ssh-keyscan -t ecdsa ${ip} >> ${HOME}/.ssh/known_hosts
-        sleep .1
-        dropletIPs[${droplet}]=${ip}
-    done
-
     # start redis on the expected port and with the right config
+    # TODO : handle cluster mode...
     echo
     echo "redis IP: " ${dropletIPs["juggler-redis"]}
     ssh root@${dropletIPs["juggler-redis"]} \
@@ -263,40 +258,45 @@ if [[ ${cmd} == "start" ]]; then
     ssh -n -f root@${dropletIPs["juggler-redis"]} \
         "sh -c 'nohup redis-server --port 7000 --maxclients 100000 > /dev/null 2>&1 &'"
 
+    redisIP=${dropletIPs["juggler-redis"]}
+
     # copy the server to juggler-server
+    serverIP=${dropletIPs["juggler-server"]}
     echo
-    echo "server IP: " ${dropletIPs["juggler-server"]}
-    ssh -n -f root@${dropletIPs["juggler-server"]} "sh -c 'pkill juggler-server'"
-    scp -C juggler-server root@${dropletIPs["juggler-server"]}:~
-    ssh -n -f root@${dropletIPs["juggler-server"]} \
-        "sh -c 'nohup ~/juggler-server -L -redis=${dropletIPs["juggler-redis"]}:7000 > /dev/null 2>&1 &'"
+    echo "server IP: " ${serverIP}
+    ssh -n -f root@${serverIP} "sh -c 'pkill juggler-server'"
+    scp -C juggler-server root@${serverIP}:~
+    ssh -n -f root@${serverIP} \
+        "sh -c 'nohup ~/juggler-server -L -redis=${redisIP}:7000 > /dev/null 2>&1 &'"
 
     # copy the callee to juggler-callee
+    calleeIP=${dropletIPs["juggler-callee"]}
     echo
-    echo "callee IP: " ${dropletIPs["juggler-callee"]}
-    ssh -n -f root@${dropletIPs["juggler-callee"]} "sh -c 'pkill juggler-callee'"
-    scp -C juggler-callee root@${dropletIPs["juggler-callee"]}:~
+    echo "callee IP: " ${calleeIP}
+    ssh -n -f root@${calleeIP} "sh -c 'pkill juggler-callee'"
+    scp -C juggler-callee root@${calleeIP}:~
 
     # start ncallees with nworkersPerCallee each
     for i in $(seq 1 $ncallees); do
-        ssh -n -f root@${dropletIPs["juggler-callee"]} \
-            "sh -c 'nohup ~/juggler-callee -n=${nuris} -port=$((9000 + $i)) -workers=${nworkersPerCallee} -redis=${dropletIPs["juggler-redis"]}:7000 > /dev/null 2>&1 &'"
+        ssh -n -f root@${calleeIP} \
+            "sh -c 'nohup ~/juggler-callee -n=${nuris} -port=$((9000 + $i)) -workers=${nworkersPerCallee} -redis=${redisIP}:7000 > /dev/null 2>&1 &'"
     done
 
     # copy the load tool to juggler-load
+    loadIP=${dropletIPs["juggler-load"]}
     echo
-    echo "load IP: " ${dropletIPs["juggler-load"]}
-    scp -C juggler-load root@${dropletIPs["juggler-load"]}:~
+    echo "load IP: " ${loadIP}
+    scp -C juggler-load root@${loadIP}:~
 
     # run the load test
     echo
     echo "starting test..."
-    ssh root@${dropletIPs["juggler-load"]} \
-        "sh -c '~/juggler-load -addr=ws://${dropletIPs["juggler-server"]}:9000/ws -c ${nclients} -n ${nuris} -r ${callRate} -t ${timeout} -d ${duration} -p ${payload} -delay ${waitForStart} -w ${waitForEnd} > ~/juggler-load.out'"
+    ssh root@${loadIP} \
+        "sh -c '~/juggler-load -addr=ws://${serverIP}:9000/ws -c ${nclients} -n ${nuris} -r ${callRate} -t ${timeout} -d ${duration} -p ${payload} -delay ${waitForStart} -w ${waitForEnd} > ~/juggler-load.out'"
 
     # retrieve the results
     outfile="misc/perf/$(date +'%Y-%m-%d_%H:%M')-c=${ncallees}-C=${nclients}-d${duration}-p${payload}-r${callRate}-t${timeout}-u${nuris}-w${nworkersPerCallee}-w1${waitForStart}-w2${waitForEnd}-cluster${cluster}-${JUGGLER_DO_SIZE}"
-    scp -C root@${dropletIPs["juggler-load"]}:~/juggler-load.out ${outfile}
+    scp -C root@${loadIP}:~/juggler-load.out ${outfile}
     echo "done."
 
     exit 0
@@ -304,6 +304,36 @@ fi
 
 # down command : destroy droplets
 if [[ ${cmd} == "down" ]]; then
+    # parse command-line arguments
+    debug=0
+    shift # the command name
+    while [[ $# > 0 ]]; do
+        key=$1
+
+        case $key in
+        --debug)
+            debug=1
+            ;;
+
+        *)
+            badFlags ${key}
+            ;;
+        esac
+        shift
+    done
+
+    if [[ ${debug} == 1 ]]; then
+        names=$(doctl compute droplet list juggler-* --no-header --format Name)
+        for name in ${names}; do
+            echo "would delete ${name}"
+        done
+
+        if [[ ${names} == "" ]]; then
+            echo "would not delete any droplet"
+        fi
+        exit 199
+    fi
+
     ids=$(doctl compute droplet list juggler-* --no-header --format ID)
     for id in ${ids}; do
         doctl compute droplet delete ${id}
@@ -312,14 +342,28 @@ if [[ ${cmd} == "down" ]]; then
 fi
 
 # invalid or no command, print usage
-echo "Usage: $0 [start|stop|help]"
+echo "Usage: $0 [down|help|make|run|up]"
 echo
-echo "help        -- Display this message."
-echo "start [--callees N --clients N --cluster --duration T --no-droplet --payload N"
-echo "       --rate T --timeout T --uris N --wait1 T --wait2 T --workers N]"
-echo "            -- Launch droplets and run load test."
-echo "               WARNING: will charge money!"
-echo "stop        -- Destroy droplets."
-echo "               WARNING: destroys droplets by name!"
+echo "down        Destroy droplets. WARNING: destroys by name!"
+echo "               --debug        dry-run, print information"
+echo "help        Display this message."
+echo "make        Build the juggler commands."
+echo "run         Execute the load test."
+echo "               -c|--callees   number of callees"
+echo "               --cluster      run in redis cluster mode"
+echo "               -C|--clients   number of client connections"
+echo "               --debug        dry-run, print information"
+echo "               -d|--duration  duration of the test"
+echo "               -p|--payload   payload of the calls (represents the"
+echo "                              duration in ms of the RPC)"
+echo "               -r|--rate      rate of requests per client"
+echo "               -t|--timeout   timeout after which RPC calls expire"
+echo "               -u|--uris      number of available RPC URIs"
+echo "               --wait1        time to wait before starting the test"
+echo "               --wait2        time to wait for the test to end properly"
+echo "               -w|--workers   number of workers per callee"
+echo "up          Create the droplets. WARNING: costs money!"
+echo "               --cluster      create droplets for a redis cluster"
+echo "               --debug        dry-run, print information"
 echo
 
