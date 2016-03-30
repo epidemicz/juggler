@@ -63,7 +63,10 @@ func main() {
 	var dial func() (redis.Conn, error)
 
 	if *redisClusterFlag {
-		cluster := newRedisCluster(*redisAddrFlag)
+		cluster, err := newRedisCluster(*redisAddrFlag)
+		if err != nil {
+			log.Fatalf("failed to connect to redis cluster: %v", err)
+		}
 		pool, dial = cluster, cluster.Dial
 	} else {
 		p, _ := newRedisPool(*redisAddrFlag)
@@ -196,11 +199,13 @@ func newBroker(pool redisbroker.Pool, dial func() (redis.Conn, error)) broker.Ca
 	}
 }
 
-func newRedisCluster(addr string) *redisc.Cluster {
-	return &redisc.Cluster{
+func newRedisCluster(addr string) (*redisc.Cluster, error) {
+	c := &redisc.Cluster{
 		StartupNodes: []string{addr},
 		CreatePool:   newRedisPool,
 	}
+	err := c.Refresh()
+	return c, err
 }
 
 func newRedisPool(addr string, opts ...redis.DialOption) (*redis.Pool, error) {
