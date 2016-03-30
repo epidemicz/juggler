@@ -83,16 +83,14 @@ if [[ ${cmd} == "up" ]]; then
         if [[ ${cluster} == 1 ]]; then
             redisName=(juggler-redis1 juggler-redis2 juggler-redis3)
         fi
-        for name in ${redisName[@]}; do
-            # create the redis droplet(s)
-            doctl compute droplet create \
-                ${name} \
-                --image redis \
-                --region ${JUGGLER_DO_REGION} \
-                --size ${JUGGLER_DO_SIZE} \
-                --ssh-keys ${JUGGLER_DO_SSHKEY} \
-                --wait
-        done
+        # create the redis droplet(s)
+        doctl compute droplet create \
+            ${redisName[@]} \
+            --image redis \
+            --region ${JUGGLER_DO_REGION} \
+            --size ${JUGGLER_DO_SIZE} \
+            --ssh-keys ${JUGGLER_DO_SSHKEY} \
+            --wait
 
         # create the client, callee and server droplet
         doctl compute droplet create \
@@ -119,7 +117,7 @@ if [[ ${cmd} == "up" ]]; then
         exit 199
     fi
 
-    # update the known_host file
+    # update the known_hosts file
     for ip in ${dropletIPs[@]}; do
         ssh-keygen -R ${ip}
         sleep .1
