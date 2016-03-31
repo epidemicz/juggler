@@ -33,6 +33,7 @@ var (
 	portFlag            = flag.Int("port", 9000, "Server `port`.")
 	redisAddrFlag       = flag.String("redis", ":6379", "Redis `address`.")
 	redisClusterFlag    = flag.Bool("redis-cluster", false, "Use redis cluster.")
+	redisMaxIdleFlag    = flag.Int("redis-max-idle", 0, "Maximum idle `connections`.")
 )
 
 func main() {

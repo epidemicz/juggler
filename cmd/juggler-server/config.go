@@ -66,7 +66,7 @@ func getDefaultConfig() *Config {
 		Redis: &Redis{
 			Addr:        *redisAddrFlag,
 			MaxActive:   0,
-			MaxIdle:     0,
+			MaxIdle:     *redisMaxIdleFlag,
 			IdleTimeout: 0,
 		},
 		CallerBroker: &CallerBroker{

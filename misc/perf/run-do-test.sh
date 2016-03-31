@@ -307,7 +307,7 @@ if [[ ${cmd} == "run" ]]; then
     scp -C juggler-server root@${serverIP}:~
 
     # start the juggler server
-    args="-L -redis=${redisIP}:7000"
+    args="-L -redis=${redisIP}:7000 -redis-max-idle=100"
     if [[ ${cluster} == 1 ]]; then
         args+=" -redis-cluster"
     fi
@@ -323,7 +323,7 @@ if [[ ${cmd} == "run" ]]; then
 
     # start ncallees with nworkersPerCallee each
     for i in $(seq 1 $ncallees); do
-        args="-n=${nuris} -port=$((9000 + $i)) -workers=${nworkersPerCallee} -redis=${redisIP}:7000"
+        args="-n=${nuris} -port=$((9000 + $i)) -workers=${nworkersPerCallee} -redis-max-idle=100 -redis=${redisIP}:7000"
         if [[ ${cluster} == 1 ]]; then
             args+=" -redis-cluster"
         fi
