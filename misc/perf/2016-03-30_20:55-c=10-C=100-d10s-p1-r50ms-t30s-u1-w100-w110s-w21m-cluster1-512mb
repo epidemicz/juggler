@@ -1,0 +1,67 @@
+
+--- CONFIGURATION
+
+Address:    ws://159.203.36.183:9000/ws
+Protocol:   juggler.0
+URI:        test.delay x 1
+Payload:    1
+
+Connections: 100
+Rate:        50ms
+Timeout:     30s
+Duration:    10s
+
+--- CLIENT STATISTICS
+
+Actual Duration: 11.022622927s
+Calls:           17988
+Acks:            17988
+Nacks:           0
+Results:         17988
+Expired:         0
+
+--- CLIENT LATENCIES
+
+Minimum:         3.711722ms
+Maximum:         1.019040167s
+Average:         545.285768ms
+Median:          592.783371ms
+75th Percentile: 657.570822ms
+90th Percentile: 711.411497ms
+99th Percentile: 830.298639ms
+
+--- SERVER STATISTICS
+
+Memory          Before          After           Diff.
+---------------------------------------------------------------
+Alloc:          833.79KB        3.52MB          2.70MB
+TotalAlloc:     833.79KB        313.24MB        312.42MB
+Mallocs:        5222            4547789         4542567
+Frees:          137             4530593         4530456
+HeapAlloc:      833.79KB        3.52MB          2.70MB
+HeapInuse:      1.09MB          5.20MB          4.12MB
+HeapObjects:    5085            17196           12111
+StackInuse:     224.00KB        512.00KB        288.00KB
+NumGC:          0               66              66
+PauseTotalNs:   0               223.699749ms    223.699749ms
+
+Counter             Before          After           Diff.
+----------------------------------------------------------------
+ActiveConnGoros:    0               0               0
+ActiveConns:        0               0               0
+MsgsRead:           0               17988           17988
+MsgsWrite:          0               35976           35976
+MsgsCALL:           0               17988           17988
+MsgsACK:            0               17988           17988
+MsgsNACK:           0               0               0
+Msgs:               0               53964           53964
+MsgsRES:            0               17988           17988
+RecoveredPanics:    0               0               0
+SlowProcessMsg:     0               6664            6664
+SlowProcessMsgCALL: 0               6664            6664
+SlowProcessMsgACK:  0               0               0
+SlowProcessMsgNACK: 0               0               0
+SlowProcessMsgRES:  0               0               0
+TotalConnGoros:     0               300             300
+TotalConns:         0               100             100
+
