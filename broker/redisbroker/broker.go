@@ -183,7 +183,11 @@ func (b *Broker) NewPubSubConn() (broker.PubSubConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newPubSubConn(rc, b.LogFunc), nil
+	return &pubSubConn{
+		psc:   redis.PubSubConn{Conn: rc},
+		logFn: b.LogFunc,
+		vars:  b.Vars,
+	}, nil
 }
 
 // NewCallsConn returns a new calls connection that can be used

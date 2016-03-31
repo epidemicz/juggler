@@ -2,6 +2,7 @@ package redisbroker
 
 import (
 	"encoding/json"
+	"expvar"
 	"sync"
 
 	"github.com/PuerkitoBio/juggler/broker"
@@ -14,6 +15,7 @@ var _ broker.PubSubConn = (*pubSubConn)(nil)
 type pubSubConn struct {
 	psc   redis.PubSubConn
 	logFn func(string, ...interface{})
+	vars  *expvar.Map
 
 	// wmu controls writes (sub/unsub calls) to the connection.
 	wmu sync.Mutex
@@ -25,10 +27,6 @@ type pubSubConn struct {
 	// errmu protects access to err.
 	errmu sync.Mutex
 	err   error
-}
-
-func newPubSubConn(rc redis.Conn, logFn func(string, ...interface{})) *pubSubConn {
-	return &pubSubConn{psc: redis.PubSubConn{Conn: rc}, logFn: logFn}
 }
 
 // Close closes the connection.
@@ -72,43 +70,51 @@ func (c *pubSubConn) subUnsub(ch string, pat bool, sub bool) error {
 func (c *pubSubConn) Events() <-chan *message.EvntPayload {
 	c.once.Do(func() {
 		c.evch = make(chan *message.EvntPayload)
-
-		go func() {
-			defer close(c.evch)
-
-			// TODO: do like Calls...
-			for {
-				switch v := c.psc.Receive().(type) {
-				case redis.Message:
-					ep, err := newEvntPayload(v.Channel, "", v.Data)
-					if err != nil {
-						logf(c.logFn, "Events: failed to unmarshal event payload: %v", err)
-						continue
-					}
-					c.evch <- ep
-
-				case redis.PMessage:
-					ep, err := newEvntPayload(v.Channel, v.Pattern, v.Data)
-					if err != nil {
-						logf(c.logFn, "Events: failed to unmarshal event payload: %v", err)
-						continue
-					}
-					c.evch <- ep
-
-				case error:
-					// possibly because the pub-sub connection was closed, but
-					// in any case, the pub-sub is now broken, terminate the
-					// loop.
-					c.errmu.Lock()
-					c.err = v
-					c.errmu.Unlock()
-					return
-				}
-			}
-		}()
+		go c.listen()
 	})
 
 	return c.evch
+}
+
+func (c *pubSubConn) listen() {
+	defer close(c.evch)
+
+	wg := sync.WaitGroup{}
+	for {
+		switch v := c.psc.Receive().(type) {
+		case redis.Message:
+			wg.Add(1)
+			go c.sendEvent(v.Channel, "", v.Data, &wg)
+
+		case redis.PMessage:
+			wg.Add(1)
+			go c.sendEvent(v.Channel, v.Pattern, v.Data, &wg)
+
+		case error:
+			// possibly because the pub-sub connection was closed, but
+			// in any case, the pub-sub is now broken, terminate the
+			// loop.
+			c.errmu.Lock()
+			c.err = v
+			c.errmu.Unlock()
+			wg.Wait()
+			return
+		}
+	}
+}
+
+func (c *pubSubConn) sendEvent(channel, pattern string, pld []byte, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	ep, err := newEvntPayload(channel, pattern, pld)
+	if err != nil {
+		if c.vars != nil {
+			c.vars.Add("FailedEvntPayloadUnmarshals", 1)
+		}
+		logf(c.logFn, "Events: failed to unmarshal event payload: %v", err)
+		return
+	}
+	c.evch <- ep
 }
 
 func newEvntPayload(channel, pattern string, pld []byte) (*message.EvntPayload, error) {
