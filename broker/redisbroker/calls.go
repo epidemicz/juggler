@@ -58,6 +58,7 @@ func (c *callsConn) CallsErr() error {
 // creating the callsConn. For use in a redis cluster, all URIs must
 // belong to the same cluster slot.
 func (c *callsConn) Calls() <-chan *message.CallPayload {
+	// TODO : clean that mess up, less closures
 	c.once.Do(func() {
 		c.ch = make(chan *message.CallPayload)
 
@@ -75,6 +76,7 @@ func (c *callsConn) Calls() <-chan *message.CallPayload {
 		go func() {
 			defer close(c.ch)
 
+			wg := sync.WaitGroup{}
 			for {
 				// BRPOP returns array with [0]: key name, [1]: payload.
 				v, err := redis.Values(rc.Do("BRPOP", args...))
@@ -89,37 +91,45 @@ func (c *callsConn) Calls() <-chan *message.CallPayload {
 					c.errmu.Lock()
 					c.err = err
 					c.errmu.Unlock()
+					wg.Wait()
 					return
 				}
 
-				// unmarshal the payload
-				var cp message.CallPayload
-				if err := unmarshalBRPOPValue(&cp, v); err != nil {
-					logf(c.logFn, "Calls: BRPOP failed to unmarshal call payload: %v", err)
-					continue
-				}
+				// TODO : same pattern in results, maybe in pubsub too?
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
 
-				// check if call is expired
-				k := fmt.Sprintf(callTimeoutKey, cp.URI, cp.MsgUUID)
-				pttl, err := redis.Int(delAndPTTLScript.Do(rc, k))
-				if err != nil {
-					if c.vars != nil {
-						c.vars.Add("FailedPTTLCalls", 1)
+					// unmarshal the payload
+					var cp message.CallPayload
+					if err := unmarshalBRPOPValue(&cp, v); err != nil {
+						logf(c.logFn, "Calls: BRPOP failed to unmarshal call payload: %v", err)
+						return
 					}
-					logf(c.logFn, "Calls: DEL/PTTL failed: %v", err)
-					continue
-				}
-				if pttl <= 0 {
-					if c.vars != nil {
-						c.vars.Add("ExpiredCalls", 1)
-					}
-					logf(c.logFn, "Calls: message %v expired, dropping call", cp.MsgUUID)
-					continue
-				}
 
-				cp.ReadTimestamp = time.Now().UTC()
-				cp.TTLAfterRead = time.Duration(pttl) * time.Millisecond
-				c.ch <- &cp
+					// check if call is expired
+					k := fmt.Sprintf(callTimeoutKey, cp.URI, cp.MsgUUID)
+					// TODO : needs a separate conn
+					pttl, err := redis.Int(delAndPTTLScript.Do(rc, k))
+					if err != nil {
+						if c.vars != nil {
+							c.vars.Add("FailedPTTLCalls", 1)
+						}
+						logf(c.logFn, "Calls: DEL/PTTL failed: %v", err)
+						return
+					}
+					if pttl <= 0 {
+						if c.vars != nil {
+							c.vars.Add("ExpiredCalls", 1)
+						}
+						logf(c.logFn, "Calls: message %v expired, dropping call", cp.MsgUUID)
+						return
+					}
+
+					cp.ReadTimestamp = time.Now().UTC()
+					cp.TTLAfterRead = time.Duration(pttl) * time.Millisecond
+					c.ch <- &cp
+				}()
 			}
 		}()
 	})
