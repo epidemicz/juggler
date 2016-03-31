@@ -248,36 +248,87 @@ if [[ ${cmd} == "run" ]]; then
     trap popdir EXIT
 
     # start redis on the expected port and with the right config
-    # TODO : handle cluster mode...
-    echo
-    echo "redis IP: " ${dropletIPs["juggler-redis"]}
-    ssh root@${dropletIPs["juggler-redis"]} \
-        "sh -c 'pkill redis-server; echo 511 > /proc/sys/net/core/somaxconn'"
-    ssh -n -f root@${dropletIPs["juggler-redis"]} \
-        "sh -c 'nohup redis-server --port 7000 --maxclients 100000 > /dev/null 2>&1 &'"
+    if [[ ${cluster} == 1 ]]; then
+        redisIP=${dropletIPs["juggler-redis1"]}
+        echo
+        lastNode=""
+        start=0
+        for ((i=1; i <= 3; i++)); do
+            ip=${dropletIPs["juggler-redis"$i]}
+            echo "redis IP $i: " ${ip}
 
-    redisIP=${dropletIPs["juggler-redis"]}
+            # kill running server and ensure bigger max tcp conns
+            ssh root@${ip} \
+                "sh -c 'pkill redis-server; echo 511 > /proc/sys/net/core/somaxconn'"
+
+            # start server in cluster mode
+            ssh -n -f root@${ip} \
+                "sh -c 'nohup redis-server --port 7000 --cluster-enabled yes --cluster-config-file node.conf --cluster-node-timeout 5000 --appendonly no --maxclients 100000 > /dev/null 2>&1 &'"
+
+            # reset the cluster info
+            ssh root@${ip} \
+                "sh -c 'redis-cli -p 7000 flushall; redis-cli -p 7000 cluster reset hard'"
+
+            # add 1/3 of the slots
+            end=$(( $i * (16384 / 3) ))
+            if [[ $i == 3 ]]; then
+                end=16383
+            fi
+            vals=$(seq ${start} ${end})
+            ssh root@${ip} \
+                "sh -c 'redis-cli -p 7000 cluster addslots " ${vals[@]} "'"
+            start=$(( ${end}+1 ))
+
+            # join the cluster
+            if [[ ${lastNode} != "" ]]; then
+                ssh root@${ip} \
+                    "sh -c 'redis-cli -p 7000 cluster meet ${lastNode} 7000'"
+            fi
+            lastNode=${ip}
+        done
+
+        # wait a little for the cluster to form, before connecting to it
+        sleep 5
+    else
+        redisIP=${dropletIPs["juggler-redis"]}
+        echo
+        echo "redis IP: " ${redisIP}
+        ssh root@${redisIP} \
+            "sh -c 'pkill redis-server; echo 511 > /proc/sys/net/core/somaxconn'"
+        ssh -n -f root@${redisIP} \
+            "sh -c 'nohup redis-server --port 7000 --maxclients 100000 > /dev/null 2>&1 &'"
+    fi
 
     # copy the server to juggler-server
     serverIP=${dropletIPs["juggler-server"]}
     echo
     echo "server IP: " ${serverIP}
-    ssh -n -f root@${serverIP} "sh -c 'pkill juggler-server'"
+    ssh root@${serverIP} "sh -c 'pkill juggler-server || true'"
     scp -C juggler-server root@${serverIP}:~
+
+    # start the juggler server
+    args="-L -redis=${redisIP}:7000"
+    if [[ ${cluster} == 1 ]]; then
+        args+=" -redis-cluster"
+    fi
     ssh -n -f root@${serverIP} \
-        "sh -c 'nohup ~/juggler-server -L -redis=${redisIP}:7000 > /dev/null 2>&1 &'"
+        "sh -c 'nohup ~/juggler-server " ${args} " > /dev/null 2>&1 &'"
 
     # copy the callee to juggler-callee
     calleeIP=${dropletIPs["juggler-callee"]}
     echo
     echo "callee IP: " ${calleeIP}
-    ssh -n -f root@${calleeIP} "sh -c 'pkill juggler-callee'"
+    ssh root@${calleeIP} "sh -c 'pkill juggler-callee || true'"
     scp -C juggler-callee root@${calleeIP}:~
 
     # start ncallees with nworkersPerCallee each
     for i in $(seq 1 $ncallees); do
+        args="-n=${nuris} -port=$((9000 + $i)) -workers=${nworkersPerCallee} -redis=${redisIP}:7000"
+        if [[ ${cluster} == 1 ]]; then
+            args+=" -redis-cluster"
+        fi
         ssh -n -f root@${calleeIP} \
-            "sh -c 'nohup ~/juggler-callee -n=${nuris} -port=$((9000 + $i)) -workers=${nworkersPerCallee} -redis=${redisIP}:7000 > /dev/null 2>&1 &'"
+            "sh -c 'nohup ~/juggler-callee " ${args} " > ~/juggler-callee$i.log 2>&1 &'"
     done
 
     # copy the load tool to juggler-load
