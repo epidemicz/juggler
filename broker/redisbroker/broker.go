@@ -159,9 +159,7 @@ func (b *Broker) Publish(channel string, pp *message.PubPayload) error {
 	// force selection of a random node (otherwise it would use
 	// the node of the hash of the channel - which may hit the
 	// same node over and over again if there are few channels).
-	if bc, ok := rc.(interface {
-		Bind(...string) error
-	}); ok {
+	if bc, ok := rc.(binder); ok {
 		// ignore the error, if it fails, use the connection as-is.
 		// Bind without a key selects a random node.
 		bc.Bind()
@@ -188,7 +186,14 @@ func (b *Broker) NewCallsConn(uris ...string) (broker.CallsConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newCallsConn(rc, uris, b.Vars, b.BlockingTimeout, b.LogFunc), nil
+	return &callsConn{
+		c:       rc,
+		pool:    b.Pool,
+		uris:    uris,
+		vars:    b.Vars,
+		timeout: b.BlockingTimeout,
+		logFn:   b.LogFunc,
+	}, nil
 }
 
 // NewResultsConn returns a new results connection that can be used
@@ -198,7 +203,14 @@ func (b *Broker) NewResultsConn(connUUID uuid.UUID) (broker.ResultsConn, error) 
 	if err != nil {
 		return nil, err
 	}
-	return newResultsConn(rc, connUUID, b.Vars, b.BlockingTimeout, b.LogFunc), nil
+	return &resultsConn{
+		c:        rc,
+		pool:     b.Pool,
+		connUUID: connUUID,
+		vars:     b.Vars,
+		timeout:  b.BlockingTimeout,
+		logFn:    b.LogFunc,
+	}, nil
 }
 
 const (
@@ -207,12 +219,14 @@ const (
 	clusterConnTryAgainDelay = 100 * time.Millisecond
 )
 
+type binder interface {
+	Bind(...string) error
+}
+
 func clusterifyConn(rc redis.Conn, keys ...string) redis.Conn {
 	// if it implements Bind, call it and make it a RetryConn so
 	// that it follows redirections in a cluster.
-	if bc, ok := rc.(interface {
-		Bind(...string) error
-	}); ok {
+	if bc, ok := rc.(binder); ok {
 		// if Bind fails, go on with the call as usual, but if it
 		// succeeds, try to turn it into a RetryConn.
 		if err := bc.Bind(keys...); err == nil {

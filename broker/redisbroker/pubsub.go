@@ -76,6 +76,7 @@ func (c *pubSubConn) Events() <-chan *message.EvntPayload {
 		go func() {
 			defer close(c.evch)
 
+			// TODO: do like Calls...
 			for {
 				switch v := c.psc.Receive().(type) {
 				case redis.Message:

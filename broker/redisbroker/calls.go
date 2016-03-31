@@ -23,6 +23,7 @@ var delAndPTTLScript = redis.NewScript(1, `
 
 type callsConn struct {
 	c       redis.Conn
+	pool    Pool
 	uris    []string
 	timeout time.Duration
 	logFn   func(string, ...interface{})
@@ -35,10 +36,6 @@ type callsConn struct {
 	// errmu protects access to err.
 	errmu sync.Mutex
 	err   error
-}
-
-func newCallsConn(rc redis.Conn, uris []string, vars *expvar.Map, to time.Duration, logFn func(string, ...interface{})) *callsConn {
-	return &callsConn{c: rc, uris: uris, vars: vars, timeout: to, logFn: logFn}
 }
 
 // Close closes the connection.

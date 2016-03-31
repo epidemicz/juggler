@@ -16,6 +16,7 @@ var _ broker.ResultsConn = (*resultsConn)(nil)
 
 type resultsConn struct {
 	c        redis.Conn
+	pool     Pool
 	connUUID uuid.UUID
 	timeout  time.Duration
 	logFn    func(string, ...interface{})
@@ -28,10 +29,6 @@ type resultsConn struct {
 	// errmu protects access to err.
 	errmu sync.Mutex
 	err   error
-}
-
-func newResultsConn(rc redis.Conn, connUUID uuid.UUID, vars *expvar.Map, to time.Duration, logFn func(string, ...interface{})) *resultsConn {
-	return &resultsConn{c: rc, connUUID: connUUID, vars: vars, timeout: to, logFn: logFn}
 }
 
 // Close closes the connection.
@@ -60,6 +57,7 @@ func (c *resultsConn) Results() <-chan *message.ResPayload {
 		// make connection cluster-aware if running in a cluster
 		rc := clusterifyConn(c.c, key)
 
+		// TODO : do like Calls...
 		go func() {
 			defer close(c.ch)
 
