@@ -58,7 +58,7 @@ func (c *Callee) InvokeAndStoreResult(cp *message.CallPayload, fn Thunk) error {
 // requested URIs and calls the corresponding Thunk to execute the
 // request. The m map has URIs as keys, and the associated Thunk
 // function as value. If a redis cluster is used, all URIs in m
-// must belong to the same hash slot (see SplitByHashSlot).
+// must belong to the same hash slot.
 //
 // The method implements a single-producer, single-consumer helper,
 // where a single redis connection is used to listen for call requests

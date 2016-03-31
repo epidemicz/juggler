@@ -12,6 +12,13 @@
 // requests are hashed on the call URI, and the results
 // are hashed on the calling connection's UUID.
 //
+// If an RPC URI is much more sollicitated than others,
+// it can be spread over multiple URIs using
+// "RPC_URI_%d" where %d is e.g. a number from 1 to 100.
+// Clients that need to call this function can use a random
+// over that range to spread the load over different cluster
+// nodes.
+//
 package redisbroker
 
 import (
@@ -214,7 +221,7 @@ func (b *Broker) NewResultsConn(connUUID uuid.UUID) (broker.ResultsConn, error) 
 }
 
 const (
-	// TODO : make that customizable? Not super critical...
+	// TODO : maybe make that customizable, not super critical.
 	clusterConnMaxAttempts   = 4
 	clusterConnTryAgainDelay = 100 * time.Millisecond
 )
