@@ -128,4 +128,7 @@ func (c *resultsConn) sendResult(v []interface{}, wg *sync.WaitGroup) {
 	}
 
 	c.ch <- &rp
+	if c.vars != nil {
+		c.vars.Add("Results", 1)
+	}
 }

@@ -35,11 +35,14 @@ The broker collects the following metrics. Because the broker can be used by the
 * FailedCallPayloadUnmarshals : incremented when the call payload returned by redis cannot be unmarshaled.
 * FailedPTTLCalls : incremented when the call to read the time-to-live of an RPC call failed.
 * ExpiredCalls : incremented when an RPC call is dropped (not sent to the callee) because it has expired.
+* Calls : incremented when a call payload is successfully sent over the calls channel to a callee.
 
 **Server metrics**
 
 * FailedEvntPayloadUnmarshals : incremented when the event payload triggered by redis pub-sub cannot be unmarshaled.
+* Events : incremented when an event payload is successfully sent over the events channel to a client.
 * FailedResPayloadUnmarshals : incremented when the result payload returned by redis cannot be unmarshaled.
 * FailedPTTLResults : incremented when the call to read the time-to-live of an RPC result failed.
 * ExpiredResults : incremented when an RPC result is dropped (not sent to the client) because it has expired.
+* Results : incremented when a result payload is successfully sent over the results channel to a client.
 

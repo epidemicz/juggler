@@ -142,6 +142,9 @@ func (c *callsConn) sendCall(v []interface{}, wg *sync.WaitGroup) {
 	cp.ReadTimestamp = time.Now().UTC()
 	cp.TTLAfterRead = time.Duration(pttl) * time.Millisecond
 	c.ch <- &cp
+	if c.vars != nil {
+		c.vars.Add("Calls", 1)
+	}
 }
 
 func unmarshalBRPOPValue(dst interface{}, src []interface{}) error {

@@ -115,6 +115,9 @@ func (c *pubSubConn) sendEvent(channel, pattern string, pld []byte, wg *sync.Wai
 		return
 	}
 	c.evch <- ep
+	if c.vars != nil {
+		c.vars.Add("Events", 1)
+	}
 }
 
 func newEvntPayload(channel, pattern string, pld []byte) (*message.EvntPayload, error) {
