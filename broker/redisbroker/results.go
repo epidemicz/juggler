@@ -57,56 +57,75 @@ func (c *resultsConn) Results() <-chan *message.ResPayload {
 		// make connection cluster-aware if running in a cluster
 		rc := clusterifyConn(c.c, key)
 
-		// TODO : do like Calls...
-		go func() {
-			defer close(c.ch)
-
-			for {
-				// BRPOP returns array with [0]: key name, [1]: payload.
-				v, err := redis.Values(rc.Do("BRPOP", key, to))
-				if err != nil {
-					if err == redis.ErrNil {
-						// no available value
-						continue
-					}
-
-					// possibly a closed connection, in any case stop
-					// the loop.
-					c.errmu.Lock()
-					c.err = err
-					c.errmu.Unlock()
-					return
-				}
-
-				// unmarshal the payload
-				var rp message.ResPayload
-				if err := unmarshalBRPOPValue(&rp, v); err != nil {
-					logf(c.logFn, "Results: BRPOP failed to unmarshal result payload: %v", err)
-					continue
-				}
-
-				// check if call is expired
-				k := fmt.Sprintf(resTimeoutKey, rp.ConnUUID, rp.MsgUUID)
-				pttl, err := redis.Int(delAndPTTLScript.Do(rc, k))
-				if err != nil {
-					if c.vars != nil {
-						c.vars.Add("FailedPTTLResults", 1)
-					}
-					logf(c.logFn, "Results: DEL/PTTL failed: %v", err)
-					continue
-				}
-				if pttl <= 0 {
-					if c.vars != nil {
-						c.vars.Add("ExpiredResults", 1)
-					}
-					logf(c.logFn, "Results: message %v expired, dropping call", rp.MsgUUID)
-					continue
-				}
-
-				c.ch <- &rp
-			}
-		}()
+		go c.pollResults(rc, key, to)
 	})
 
 	return c.ch
+}
+
+func (c *resultsConn) pollResults(pollConn redis.Conn, key string, timeout int) {
+	defer close(c.ch)
+
+	wg := sync.WaitGroup{}
+	for {
+		// BRPOP returns array with [0]: key name, [1]: payload.
+		v, err := redis.Values(pollConn.Do("BRPOP", key, timeout))
+		if err != nil {
+			if err == redis.ErrNil {
+				// no available value
+				continue
+			}
+
+			// possibly a closed connection, in any case stop
+			// the loop.
+			c.errmu.Lock()
+			c.err = err
+			c.errmu.Unlock()
+			wg.Wait()
+			return
+		}
+
+		wg.Add(1)
+		go c.sendResult(v, &wg)
+	}
+}
+
+// receives the raw value v retured from BRPOP.
+func (c *resultsConn) sendResult(v []interface{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	// unmarshal the payload
+	var rp message.ResPayload
+	if err := unmarshalBRPOPValue(&rp, v); err != nil {
+		if c.vars != nil {
+			c.vars.Add("FailedResPayloadUnmarshals", 1)
+		}
+		logf(c.logFn, "Results: BRPOP failed to unmarshal result payload: %v", err)
+		return
+	}
+
+	// check if call is expired
+	k := fmt.Sprintf(resTimeoutKey, rp.ConnUUID, rp.MsgUUID)
+
+	rc := c.pool.Get()
+	defer rc.Close()
+	rc = clusterifyConn(rc, k)
+
+	pttl, err := redis.Int(delAndPTTLScript.Do(rc, k))
+	if err != nil {
+		if c.vars != nil {
+			c.vars.Add("FailedPTTLResults", 1)
+		}
+		logf(c.logFn, "Results: DEL/PTTL failed: %v", err)
+		return
+	}
+	if pttl <= 0 {
+		if c.vars != nil {
+			c.vars.Add("ExpiredResults", 1)
+		}
+		logf(c.logFn, "Results: message %v expired, dropping call", rp.MsgUUID)
+		return
+	}
+
+	c.ch <- &rp
 }
