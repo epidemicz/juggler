@@ -18,10 +18,9 @@ import (
 )
 
 var (
-	calleeAddrFlag = flag.String("callee", ":9001", "Callee `address`.")
-	durationFlag   = flag.Duration("d", 10*time.Second, "Duration of the test.")
-	redisAddrFlag  = flag.String("redis", ":6379", "Redis `address`.")
-	timeoutFlag    = flag.Duration("t", time.Second, "`Timeout` of the call.")
+	durationFlag  = flag.Duration("d", 10*time.Second, "Duration of the test.")
+	redisAddrFlag = flag.String("redis", ":6379", "Redis `address`.")
+	timeoutFlag   = flag.Duration("t", time.Second, "`Timeout` of the call.")
 )
 
 func main() {
@@ -39,7 +38,6 @@ func main() {
 	defer c.Close()
 	for i := 0; i < 100; i++ {
 		go func() {
-
 			for range c.Results() {
 				atomic.AddInt64(&results, 1)
 			}
