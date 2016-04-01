@@ -2,7 +2,7 @@
 
 ## redis tests
 
-All tests run for 10s.
+All tests run for 10s, locally on MbP 2015.
 
 1. Pure redis LPUSH and BRPOP in 2 separate goroutines and static string payload:
     `push: 183200, pop: 183200`
@@ -16,6 +16,19 @@ All tests run for 10s.
     `push: 102259, pop: 63886`
 6. juggler-direct-call test with 100 listener goroutines on results, 100 workers on callees, log redirected to /dev/null:
     `calls: 25540, results: 25540, timeout: 1s`
+7. Pure redis with N push and N pop goroutines (tops at around 5-10 goroutines, using more doesn't yield better throughput):
+    `push: 337672, pop: 337672`
+
+On smallest DO droplet (512mb):
+
+1. Pure redis:
+    `push: 132694, pop: 132694`
+2. Marshal and unmarshal CallPayload:
+    `push: 106167, pop: 106167`
+3. Scripts on both push and pop:
+    `push: 71255, pop: 42670`
+4. Pure redis with N goros:
+    `push: 199641, pop: 199641`
 
 ## DO load tests
 
