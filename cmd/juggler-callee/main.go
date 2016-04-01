@@ -72,9 +72,9 @@ func main() {
 		p, _ := newRedisPool(*redisAddrFlag)
 		pool, dial = p, p.Dial
 	}
-	c := &callee.Callee{Broker: newBroker(pool, dial)}
 
 	vars := expvar.NewMap("callee")
+	c := &callee.Callee{Broker: newBroker(pool, dial, vars)}
 
 	// start a web server to serve pprof and expvar data
 	log.Printf("serving debug endpoints on %d", *httpServerPortFlag)
@@ -190,12 +190,13 @@ func echo(s string) string {
 	return s
 }
 
-func newBroker(pool redisbroker.Pool, dial func() (redis.Conn, error)) broker.CalleeBroker {
+func newBroker(pool redisbroker.Pool, dial func() (redis.Conn, error), vars *expvar.Map) broker.CalleeBroker {
 	return &redisbroker.Broker{
 		Pool:            pool,
 		Dial:            dial,
 		BlockingTimeout: *brokerBlockingTimeoutFlag,
 		ResultCap:       *brokerResultCapFlag,
+		Vars:            vars,
 	}
 }
 
