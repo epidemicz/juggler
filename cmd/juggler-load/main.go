@@ -37,7 +37,7 @@ var (
 	numURIsFlag     = flag.Int("n", 0, "Spread calls to this `number` of URIs (added as a suffix to the URI).")
 	payloadFlag     = flag.String("p", "100", "Call `payload`.")
 	subprotoFlag    = flag.String("proto", "juggler.0", "Websocket `subprotocol`.")
-	callRateFlag    = flag.Duration("r", 100*time.Millisecond, "Call `rate` per connection.")
+	callRateFlag    = flag.Duration("r", 100*time.Millisecond, "Call `rate` per connection. A negative rate makes a call once the previous response is received.")
 	callTimeoutFlag = flag.Duration("t", time.Second, "Call `timeout`.")
 	uriFlag         = flag.String("u", "test.delay", "Call `URI`.")
 	waitFlag        = flag.Duration("w", 5*time.Second, "Wait `duration` for connections to stop.")
@@ -344,7 +344,7 @@ func main() {
 	}
 
 	// start clients with some jitter, up to 10ms
-	log.Printf("%d connections started...", stats.Conns)
+	log.Printf("%d connections started at rate %s...", stats.Conns, stats.Rate)
 	start := time.Now()
 	for i := 0; i < stats.Conns; i++ {
 		<-time.After(time.Duration(rand.Intn(int(10 * time.Millisecond))))
@@ -417,6 +417,14 @@ func runClient(stats *runStats, started chan<- struct{}, stop <-chan struct{}, r
 	var latencies []time.Duration
 	startTimes := make(map[string]time.Time)
 
+	var next chan int
+	if stats.Rate < 0 {
+		// negative rate means send another message once the previous response
+		// is received (or expired).
+		next = make(chan int, 1)
+		next <- 1 // initialize ready to send
+	}
+
 	cli, err := client.Dial(
 		&websocket.Dialer{Subprotocols: []string{stats.Protocol}},
 		stats.Addr, nil,
@@ -430,8 +438,18 @@ func runClient(stats *runStats, started chan<- struct{}, stop <-chan struct{}, r
 				latencies = append(latencies, dur)
 				mu.Unlock()
 				atomic.AddInt64(&stats.Res, 1)
+
+				if stats.Rate < 0 {
+					next <- 1
+				}
+
 			case client.ExpMsg:
 				atomic.AddInt64(&stats.Exp, 1)
+
+				if stats.Rate < 0 {
+					next <- 1
+				}
+
 			case message.AckMsg:
 				atomic.AddInt64(&stats.Ack, 1)
 				return
@@ -447,14 +465,18 @@ func runClient(stats *runStats, started chan<- struct{}, stop <-chan struct{}, r
 		log.Fatalf("Dial failed: %v", err)
 	}
 
-	var after time.Duration
+	var after <-chan time.Time
+	if stats.Rate >= 0 {
+		after = time.After(0)
+	}
 	started <- struct{}{}
 loop:
 	for {
 		select {
 		case <-stop:
 			break loop
-		case <-time.After(after):
+		case <-next: // nil if Rate >= 0
+		case <-after: // nil if Rate < 0
 		}
 
 		wgResults.Add(1)
@@ -466,7 +488,10 @@ loop:
 		mu.Lock()
 		startTimes[uid.String()] = time.Now()
 		mu.Unlock()
-		after = stats.Rate
+
+		if stats.Rate >= 0 {
+			after = time.After(stats.Rate)
+		}
 	}
 	// wait for sent calls to return or expire
 	wgResults.Wait()

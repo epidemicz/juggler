@@ -304,7 +304,7 @@ if [[ ${cmd} == "run" ]]; then
     echo
     echo "server IP: " ${serverIP}
     ssh root@${serverIP} "sh -c 'pkill juggler-server || true'"
-    scp -C juggler-server root@${serverIP}:~
+    rsync -u juggler-server root@${serverIP}:~
 
     # start the juggler server
     args="-L -redis=${redisIP}:7000 -redis-max-idle=100"
@@ -319,7 +319,7 @@ if [[ ${cmd} == "run" ]]; then
     echo
     echo "callee IP: " ${calleeIP}
     ssh root@${calleeIP} "sh -c 'pkill juggler-callee || true'"
-    scp -C juggler-callee root@${calleeIP}:~
+    rsync -u juggler-callee root@${calleeIP}:~
 
     # start ncallees with nworkersPerCallee each
     for i in $(seq 1 $ncallees); do
@@ -335,7 +335,7 @@ if [[ ${cmd} == "run" ]]; then
     loadIP=${dropletIPs["juggler-load"]}
     echo
     echo "load IP: " ${loadIP}
-    scp -C juggler-load root@${loadIP}:~
+    rsync -u juggler-load root@${loadIP}:~
 
     # run the load test
     echo
