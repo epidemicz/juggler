@@ -79,3 +79,44 @@ func TestNewNackFromAck(t *testing.T) {
 	assert.Equal(t, nack.Payload.URI, ack.Payload.URI, "URI")
 	assert.Equal(t, nack.Payload.Channel, ack.Payload.Channel, "Channel")
 }
+
+func TestUnmarshalRequest(t *testing.T) {
+	call, err := NewCall("u", "payload", time.Second)
+	require.NoError(t, err, "NewCall failed")
+	sub := NewSub("c", false)
+	unsb := NewUnsb("d", false)
+	pub, err := NewPub("p", "payload")
+	require.NoError(t, err, "NewPub failed")
+	ack := NewAck(pub)
+
+	cases := []struct {
+		v       interface{}
+		allowed []Type
+		wantErr bool
+	}{
+		{call, nil, false},
+		{sub, nil, false},
+		{unsb, nil, false},
+		{pub, nil, false},
+		{ack, nil, true},
+		{call, []Type{CallMsg}, false},
+		{sub, []Type{SubMsg}, false},
+		{unsb, []Type{UnsbMsg}, false},
+		{pub, []Type{PubMsg}, false},
+		{ack, []Type{AckMsg}, true}, // Ack not a request message type, still not allowed
+		{call, []Type{CallMsg, PubMsg}, false},
+		{sub, []Type{CallMsg, PubMsg}, true},
+		{unsb, []Type{CallMsg, PubMsg}, true},
+		{pub, []Type{CallMsg, PubMsg}, false},
+		{ack, []Type{CallMsg, PubMsg}, true},
+	}
+	for i, c := range cases {
+		b, err := json.Marshal(c.v)
+		require.NoError(t, err, "%d: Marshal failed", i)
+		_, err = UnmarshalRequest(bytes.NewReader(b), c.allowed...)
+
+		if !assert.Equal(t, err != nil, c.wantErr, "%d", i) {
+			t.Logf("%d: want error? %t, got %v", i, c.wantErr, err)
+		}
+	}
+}

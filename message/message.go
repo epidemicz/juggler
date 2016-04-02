@@ -434,10 +434,16 @@ var allReqMsgs = []Type{CallMsg, SubMsg, UnsbMsg, PubMsg}
 // type is invalid for a request (client -> server) and for the restricted
 // list of allowed messages, if any.
 func UnmarshalRequest(r io.Reader, allowedMsgs ...Type) (Msg, error) {
-	if len(allowedMsgs) == 0 {
-		allowedMsgs = allReqMsgs
+	var cleaned []Type
+	for _, t := range allowedMsgs {
+		if t.IsRead() {
+			cleaned = append(cleaned, t)
+		}
 	}
-	return unmarshalIf(r, allowedMsgs...)
+	if len(cleaned) == 0 {
+		cleaned = allReqMsgs
+	}
+	return unmarshalIf(r, cleaned...)
 }
 
 // UnmarshalResponse unmarshals a JSON-encoded message from r into the
