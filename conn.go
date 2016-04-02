@@ -46,6 +46,8 @@ type Conn struct {
 
 	// the underlying websocket connection.
 	wsConn *websocket.Conn
+	// allowed types of messages from the client (empty means any)
+	allowedMsgs []message.Type
 
 	wmu  chan struct{} // write lock
 	srv  *Server
@@ -57,18 +59,19 @@ type Conn struct {
 	kill      chan struct{}
 }
 
-func newConn(c *websocket.Conn, srv *Server) *Conn {
+func newConn(c *websocket.Conn, srv *Server, allowedMsgs ...message.Type) *Conn {
 	// wmu is the write lock, used as mutex so it can be select'ed upon.
 	// start with an available slot (initialize with a sent value).
 	wmu := make(chan struct{}, 1)
 	wmu <- struct{}{}
 
 	return &Conn{
-		UUID:   uuid.NewRandom(),
-		wsConn: c,
-		wmu:    wmu,
-		srv:    srv,
-		kill:   make(chan struct{}),
+		UUID:        uuid.NewRandom(),
+		wsConn:      c,
+		allowedMsgs: allowedMsgs,
+		wmu:         wmu,
+		srv:         srv,
+		kill:        make(chan struct{}),
 	}
 }
 
@@ -108,8 +111,12 @@ func (c *Conn) Subprotocol() string {
 func (c *Conn) Close(err error) {
 	c.closeOnce.Do(func() {
 		c.CloseErr = err
-		c.psc.Close()
-		c.resc.Close()
+		if c.psc != nil {
+			c.psc.Close()
+		}
+		if c.resc != nil {
+			c.resc.Close()
+		}
 		close(c.kill)
 	})
 }
@@ -272,7 +279,7 @@ func (c *Conn) receive() {
 			c.wsConn.SetReadDeadline(time.Now().Add(to))
 		}
 
-		m, err := message.UnmarshalRequest(r)
+		m, err := message.UnmarshalRequest(r, c.allowedMsgs...)
 		if err != nil {
 			c.Close(err)
 			return

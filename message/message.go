@@ -427,11 +427,17 @@ func NewEvnt(pld *EvntPayload) *Evnt {
 	return ev
 }
 
+var allReqMsgs = []Type{CallMsg, SubMsg, UnsbMsg, PubMsg}
+
 // UnmarshalRequest unmarshals a JSON-encoded message from r into the
 // correct concrete message type. It returns an error if the message
-// type is invalid for a request (client -> server).
-func UnmarshalRequest(r io.Reader) (Msg, error) {
-	return unmarshalIf(r, CallMsg, SubMsg, UnsbMsg, PubMsg)
+// type is invalid for a request (client -> server) and for the restricted
+// list of allowed messages, if any.
+func UnmarshalRequest(r io.Reader, allowedMsgs ...Type) (Msg, error) {
+	if len(allowedMsgs) == 0 {
+		allowedMsgs = allReqMsgs
+	}
+	return unmarshalIf(r, allowedMsgs...)
 }
 
 // UnmarshalResponse unmarshals a JSON-encoded message from r into the
