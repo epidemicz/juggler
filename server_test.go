@@ -93,8 +93,10 @@ func TestUpgrade(t *testing.T) {
 
 	h := client.HandlerFunc(func(ctx context.Context, cli *client.Client, m message.Msg) {})
 
-	// valid subprotocol - no protocol will be set to juggler automatically
-	cli, err := client.Dial(&websocket.Dialer{}, srv.URL, nil, client.SetHandler(h), client.SetLogFunc(dbgl.Printf))
+	// ******* DIAL #1 ********
+	// valid subprotocol
+	// ******* DIAL #1 ********
+	cli, err := client.Dial(&websocket.Dialer{Subprotocols: juggler.Subprotocols}, srv.URL, nil, client.SetHandler(h), client.SetLogFunc(dbgl.Printf))
 	require.NoError(t, err, "Dial 1")
 	cli.Close()
 	select {
@@ -103,7 +105,9 @@ func TestUpgrade(t *testing.T) {
 		assert.Fail(t, "no close signal received for Dial 1")
 	}
 
+	// ******* DIAL #2 ********
 	// invalid subprotocol, websocket connection will be closed
+	// ******* DIAL #2 ********
 	cli, err = client.Dial(&websocket.Dialer{}, srv.URL, http.Header{"Sec-WebSocket-Protocol": {"test"}}, client.SetHandler(h), client.SetLogFunc(dbgl.Printf))
 	require.NoError(t, err, "Dial 2")
 	// no need to call Close, Upgrade will refuse the connection
@@ -111,6 +115,39 @@ func TestUpgrade(t *testing.T) {
 	case <-cli.CloseNotify():
 	case <-time.After(100 * time.Millisecond):
 		assert.Fail(t, "no close signal received for Dial 2")
+	}
+	cli.Close()
+
+	// ******* DIAL #3 ********
+	// call with a restricted list of allowed messages
+	// ******* DIAL #3 ********
+	cli, err = client.Dial(&websocket.Dialer{Subprotocols: juggler.Subprotocols}, srv.URL, http.Header{"Juggler-Allowed-Messages": {"call, pub"}}, client.SetHandler(h), client.SetLogFunc(dbgl.Printf))
+	require.NoError(t, err, "Dial 3")
+
+	// make a call, should work
+	_, err = cli.Call("u", "c1", time.Second)
+	assert.NoError(t, err, "Call is allowed")
+	select {
+	case <-cli.CloseNotify():
+		assert.Fail(t, "Call caused the connection to close")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	// make a pub, should work
+	_, err = cli.Pub("c", "p1")
+	assert.NoError(t, err, "Pub is allowed")
+	select {
+	case <-cli.CloseNotify():
+		assert.Fail(t, "Pub caused the connection to close")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	// subscribe should not work, and should close the client (may not immediately return an error though)
+	cli.Sub("c", false)
+	select {
+	case <-cli.CloseNotify():
+	case <-time.After(100 * time.Millisecond):
+		assert.Fail(t, "no close signal received for Dial 3")
 	}
 	cli.Close()
 }
