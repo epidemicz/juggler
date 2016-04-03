@@ -123,3 +123,34 @@ func TestClient(t *testing.T) {
 		assert.Equal(t, io.EOF, finalErr, "EOF")
 	}
 }
+
+func TestClientConcurrent(t *testing.T) {
+	done := make(chan bool, 1)
+	srv := wstest.StartRecordingServer(t, done, ioutil.Discard)
+	defer srv.Close()
+
+	h := HandlerFunc(func(ctx context.Context, m message.Msg) {})
+	cli, err := Dial(&websocket.Dialer{}, srv.URL, nil, SetHandler(h),
+		SetCallTimeout(time.Millisecond))
+	require.NoError(t, err, "Dial")
+
+	n := 2
+	wg := sync.WaitGroup{}
+	wg.Add(n)
+	for i := 0; i < n; i++ {
+		go func() {
+			defer wg.Done()
+
+			// don't even check errors, because client may be closed by other goro
+			cli.Call("a", "call", 0)
+			cli.Pub("b", "pub")
+			cli.Sub("c", false)
+			cli.Unsb("d", true)
+
+			cli.Close()
+		}()
+	}
+	wg.Wait()
+	<-done
+	<-cli.CloseNotify()
+}
