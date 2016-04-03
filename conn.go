@@ -1,7 +1,6 @@
 package juggler
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -11,15 +10,11 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/PuerkitoBio/juggler/broker"
+	"github.com/PuerkitoBio/juggler/internal/wswriter"
 	"github.com/PuerkitoBio/juggler/message"
 	"github.com/gorilla/websocket"
 	"github.com/pborman/uuid"
 )
-
-// ErrWriteLockTimeout is returned when a call to Write fails
-// because the write lock of the connection cannot be acquired before
-// the timeout.
-var ErrWriteLockTimeout = errors.New("juggler: timed out waiting for write lock")
 
 // ConnState represents the possible states of a connection.
 type ConnState int
@@ -121,63 +116,9 @@ func (c *Conn) Close(err error) {
 	})
 }
 
-// writer that acquires the connection's write lock prior to writing.
-type exclusiveWriter struct {
-	w            io.WriteCloser
-	init         bool
-	writeLock    chan struct{}
-	lockTimeout  time.Duration
-	writeTimeout time.Duration
-	wsConn       *websocket.Conn
-}
-
-func (w *exclusiveWriter) Write(p []byte) (int, error) {
-	if !w.init {
-		var wait <-chan time.Time
-		if to := w.lockTimeout; to > 0 {
-			wait = time.After(to)
-		}
-
-		// try to acquire the write lock before the timeout
-		select {
-		case <-wait:
-			return 0, ErrWriteLockTimeout
-
-		case <-w.writeLock:
-			// lock acquired, get next writer from the websocket connection
-			w.init = true
-			wc, err := w.wsConn.NextWriter(websocket.TextMessage)
-			if err != nil {
-				return 0, err
-			}
-			w.w = wc
-			if to := w.writeTimeout; to > 0 {
-				w.wsConn.SetWriteDeadline(time.Now().Add(to))
-			}
-		}
-	}
-
-	return w.w.Write(p)
-}
-
-func (w *exclusiveWriter) Close() error {
-	if !w.init {
-		// no write, Close is a no-op
-		return nil
-	}
-
-	var err error
-	if w.w != nil {
-		// if w.init is true, then NextWriter was called and that writer
-		// must be properly closed.
-		err = w.w.Close()
-		w.wsConn.SetWriteDeadline(time.Time{})
-	}
-
-	// release the write lock
-	w.writeLock <- struct{}{}
-	return err
-}
+// ErrWriteLockTimeout is the error returned when the writer returned
+// by Conn.Writer fails to acquire the write lock in the given time.
+var ErrWriteLockTimeout = wswriter.ErrWriteLockTimeout
 
 // Writer returns an io.WriteCloser that can be used to send a
 // message on the connection. Only one writer can be active at
@@ -197,12 +138,12 @@ func (w *exclusiveWriter) Close() error {
 // The returned writer itself is not safe for concurrent use, but
 // as all Conn methods, Writer can be called concurrently.
 func (c *Conn) Writer(timeout time.Duration) io.WriteCloser {
-	return &exclusiveWriter{
-		writeLock:    c.wmu,
-		lockTimeout:  timeout,
-		writeTimeout: c.srv.WriteTimeout,
-		wsConn:       c.wsConn,
-	}
+	return wswriter.New(
+		c.wsConn,
+		c.wmu,
+		timeout,
+		c.srv.WriteTimeout,
+	)
 }
 
 // Send sends the message to the client. It calls the Server's
