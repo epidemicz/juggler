@@ -143,7 +143,7 @@ Median:          96.374854ms
 99th Percentile: 347.435284ms
 ```
 
-Same load over 6 workers doesn't make it better, to scale more than this will require more client connections, I think.
+Same load over 6 workers doesn't make it better.
 
 ```
 --- CLIENT STATISTICS
@@ -166,3 +166,25 @@ Median:          146.159373ms
 99th Percentile: 383.518786ms
 ```
 
+With the -1s rate (auto-regulated clients, next call is sent only when response from previous call is received), it also tops at around 2000 calls per second:
+
+```
+--- CLIENT STATISTICS
+
+Actual Duration: 11.432001962s
+Calls:           19612
+Acks:            19612
+Nacks:           0
+Results:         19612
+Expired:         0
+
+--- CLIENT LATENCIES
+
+Minimum:         6.493948ms
+Maximum:         354.051851ms
+Average:         108.678899ms
+Median:          107.953711ms
+75th Percentile: 122.757087ms
+90th Percentile: 150.326661ms
+99th Percentile: 252.28389ms
+```
