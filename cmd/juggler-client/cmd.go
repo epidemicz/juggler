@@ -110,7 +110,7 @@ var connectCmd = &cmd{
 
 type connMsgLogger int
 
-func (l connMsgLogger) Handle(ctx context.Context, cli *client.Client, m message.Msg) {
+func (l connMsgLogger) Handle(ctx context.Context, m message.Msg) {
 	var s string
 	switch m := m.(type) {
 	case *message.Nack:

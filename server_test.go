@@ -91,7 +91,7 @@ func TestUpgrade(t *testing.T) {
 	srv.URL = strings.Replace(srv.URL, "http:", "ws:", 1)
 	defer srv.Close()
 
-	h := client.HandlerFunc(func(ctx context.Context, cli *client.Client, m message.Msg) {})
+	h := client.HandlerFunc(func(ctx context.Context, m message.Msg) {})
 
 	// ******* DIAL #1 ********
 	// valid subprotocol

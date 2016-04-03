@@ -217,7 +217,7 @@ func serverHandler(t *testing.T, brk broker.PubSubBroker, rc *runConfig, stats *
 }
 
 func clientHandler(stats *runStats) client.Handler {
-	return client.HandlerFunc(func(ctx context.Context, c *client.Client, m message.Msg) {
+	return client.HandlerFunc(func(ctx context.Context, m message.Msg) {
 		incStats(stats, m, false)
 	})
 }

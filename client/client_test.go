@@ -25,7 +25,7 @@ func TestClientClose(t *testing.T) {
 	srv := wstest.StartRecordingServer(t, done, ioutil.Discard)
 	defer srv.Close()
 
-	h := HandlerFunc(func(ctx context.Context, cli *Client, m message.Msg) {})
+	h := HandlerFunc(func(ctx context.Context, m message.Msg) {})
 	cli, err := Dial(&websocket.Dialer{}, srv.URL, nil, SetHandler(h), SetLogFunc((&jugglertest.DebugLog{T: t}).Printf))
 	require.NoError(t, err, "Dial")
 
@@ -54,7 +54,7 @@ func TestClient(t *testing.T) {
 		expForUUID uuid.UUID
 		wg         sync.WaitGroup
 	)
-	h := HandlerFunc(func(ctx context.Context, cli *Client, m message.Msg) {
+	h := HandlerFunc(func(ctx context.Context, m message.Msg) {
 		defer wg.Done()
 
 		mu.Lock()

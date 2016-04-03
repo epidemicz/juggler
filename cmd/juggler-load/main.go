@@ -429,7 +429,7 @@ func runClient(stats *runStats, started chan<- struct{}, stop <-chan struct{}, r
 		&websocket.Dialer{Subprotocols: []string{stats.Protocol}},
 		stats.Addr, nil,
 		client.SetLogFunc(juggler.DiscardLog),
-		client.SetHandler(client.HandlerFunc(func(ctx context.Context, c *client.Client, m message.Msg) {
+		client.SetHandler(client.HandlerFunc(func(ctx context.Context, m message.Msg) {
 			switch m.Type() {
 			case message.ResMsg:
 				rm := m.(*message.Res)

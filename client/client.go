@@ -1,5 +1,5 @@
-// Package client implements a juggler client. Once a Client value is
-// obtained via a call to Dial, it can be used to make calls to an
+// Package client implements a juggler client. Once a Client is
+// returned via a call to Dial, it can be used to make calls to an
 // RPC function identified by a URI, to subscribe to and unsubscribe
 // from pub-sub channels, and to publish events to a pub-sub channel.
 //
@@ -27,13 +27,9 @@ import (
 	"github.com/pborman/uuid"
 )
 
-// Client is a juggler client based on a websocket connection. It can
-// be used to send and receive messages to and from a juggler server.
+// Client is a juggler client based on a websocket connection. It is
+// used to send and receive messages to and from a juggler server.
 type Client struct {
-	// ResponseHeader is the map of HTTP response headers returned
-	// from the initial websocket handshake.
-	ResponseHeader http.Header
-
 	callTimeout time.Duration
 	handler     Handler
 	logFunc     func(string, ...interface{})
@@ -46,14 +42,13 @@ type Client struct {
 }
 
 // NewClient creates a juggler client using the provided websocket
-// connection and response header. Received messages are sent to
-// the handler set by the SetHandler option.
-func NewClient(conn *websocket.Conn, resHeader http.Header, opts ...Option) *Client {
+// connection. Received messages are sent to the handler set by
+// the SetHandler option.
+func NewClient(conn *websocket.Conn, opts ...Option) *Client {
 	c := &Client{
-		ResponseHeader: resHeader,
-		conn:           conn,
-		stop:           make(chan struct{}),
-		results:        make(map[string]struct{}),
+		conn:    conn,
+		stop:    make(chan struct{}),
+		results: make(map[string]struct{}),
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -98,7 +93,7 @@ func (c *Client) handleMessages() {
 			}
 		}
 
-		go c.handler.Handle(context.Background(), c, m)
+		go c.handler.Handle(context.Background(), m)
 	}
 }
 
@@ -110,13 +105,15 @@ func (c *Client) handleMessages() {
 // create the client once the connection is established, using NewClient.
 //
 // The Dialer's Subprotocols field should be set to one of (or any/all of)
-// juggler.Subprotocol.
+// juggler.Subprotocol. To limit the client to a restricted subset of
+// messages, set the Juggler-Allowed-Messages header on reqHeader
+// (see the documentation of juggler.Upgrade for details).
 func Dial(d *websocket.Dialer, urlStr string, reqHeader http.Header, opts ...Option) (*Client, error) {
-	conn, res, err := d.Dial(urlStr, reqHeader)
+	conn, _, err := d.Dial(urlStr, reqHeader)
 	if err != nil {
 		return nil, err
 	}
-	return NewClient(conn, res.Header, opts...), nil
+	return NewClient(conn, opts...), nil
 }
 
 // Close closes the connection. No more messages will be received.
@@ -147,7 +144,7 @@ func (c *Client) UnderlyingConn() *websocket.Conn {
 // It returns the UUID of the call message on success, or an error if
 // the call request could not be sent to the server.
 func (c *Client) Call(uri string, v interface{}, timeout time.Duration) (uuid.UUID, error) {
-	if timeout == 0 {
+	if timeout <= 0 {
 		timeout = c.callTimeout
 	}
 	m, err := message.NewCall(uri, v, timeout)
@@ -180,7 +177,7 @@ func (c *Client) handleExpiredCall(m *message.Call, timeout time.Duration) {
 	if ok := c.deletePending(m.UUID().String()); ok {
 		// if so, send an Exp message
 		exp := newExp(m)
-		go c.handler.Handle(context.Background(), c, exp)
+		go c.handler.Handle(context.Background(), exp)
 	}
 }
 
@@ -243,16 +240,16 @@ func (c *Client) Pub(channel string, v interface{}) (uuid.UUID, error) {
 // Handler defines the method required to handle a message received
 // from the server.
 type Handler interface {
-	Handle(context.Context, *Client, message.Msg)
+	Handle(context.Context, message.Msg)
 }
 
 // HandlerFunc is a function that implements the Handler interface.
-type HandlerFunc func(context.Context, *Client, message.Msg)
+type HandlerFunc func(context.Context, message.Msg)
 
 // Handle implements Handler for a HandlerFunc. It calls fn
 // with the parameters.
-func (fn HandlerFunc) Handle(ctx context.Context, cli *Client, m message.Msg) {
-	fn(ctx, cli, m)
+func (fn HandlerFunc) Handle(ctx context.Context, m message.Msg) {
+	fn(ctx, m)
 }
 
 // Option sets an option on the Client.
