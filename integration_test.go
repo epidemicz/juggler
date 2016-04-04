@@ -366,8 +366,7 @@ func runIntegrationTest(t *testing.T, conf *IntgConfig) {
 	for i := 0; i < conf.NCallees; i++ {
 		go func(i int) {
 			cle := callee.Callee{
-				Broker:  brk,
-				LogFunc: dbgl.Printf,
+				Broker: brk,
 			}
 
 			conn, err := brk.NewCallsConn(uris...)
@@ -407,9 +406,9 @@ func runIntegrationTest(t *testing.T, conf *IntgConfig) {
 		go func(i int) {
 			defer wg.Done()
 
-			cli, err := client.Dial(&websocket.Dialer{Subprotocols: juggler.Subprotocols}, strings.Replace(httpsrv.URL, "http:", "ws:", 1), nil,
-				client.SetHandler(clientHandler(&clientStats)),
-				client.SetLogFunc(dbgl.Printf))
+			cli, err := client.Dial(&websocket.Dialer{Subprotocols: juggler.Subprotocols},
+				strings.Replace(httpsrv.URL, "http:", "ws:", 1), nil,
+				client.SetHandler(clientHandler(&clientStats)))
 
 			clientStarted <- struct{}{}
 			if err != nil {
