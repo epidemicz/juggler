@@ -19,6 +19,7 @@ import (
 	"github.com/PuerkitoBio/juggler"
 	"github.com/PuerkitoBio/juggler/broker"
 	"github.com/PuerkitoBio/juggler/broker/redisbroker"
+	"github.com/PuerkitoBio/juggler/internal/srvhandler"
 	"github.com/PuerkitoBio/juggler/message"
 	"github.com/PuerkitoBio/redisc"
 	"github.com/garyburd/redigo/redis"
@@ -60,7 +61,7 @@ func main() {
 
 	logFn := log.Printf
 	if *noLogFlag {
-		logFn = juggler.DiscardLog
+		logFn = func(_ string, _ ...interface{}) {}
 	}
 
 	// create pool, brokers, server, upgrader, HTTP server
@@ -158,15 +159,14 @@ func newHandler(conf *Server, logFn func(string, ...interface{})) juggler.Handle
 				panic("called panic URI")
 			}
 		}
-		juggler.ProcessMsg(ctx, c, m)
+		juggler.ProcessMsg(c, m)
 	})
 
 	chain := []juggler.Handler{process}
 	if !*noLogFlag {
-		chain = append([]juggler.Handler{juggler.HandlerFunc(juggler.LogMsg)}, chain...)
+		chain = append([]juggler.Handler{srvhandler.LogMsg(logFn)}, chain...)
 	}
-	return juggler.PanicRecover(
-		juggler.Chain(chain...))
+	return srvhandler.PanicRecover(srvhandler.Chain(chain...), nil)
 }
 
 func newPubSubBroker(pool redisbroker.Pool, dial func() (redis.Conn, error), logFn func(string, ...interface{})) broker.PubSubBroker {
@@ -228,7 +228,7 @@ func newServer(conf *Server, pubSub broker.PubSubBroker, caller broker.CallerBro
 		juggler.Subprotocols = append(juggler.Subprotocols, "")
 	}
 
-	cs := juggler.LogConn
+	cs := srvhandler.LogConn(logFn)
 	if *noLogFlag {
 		cs = nil
 	}
@@ -241,7 +241,6 @@ func newServer(conf *Server, pubSub broker.PubSubBroker, caller broker.CallerBro
 		ConnState:               cs,
 		PubSubBroker:            pubSub,
 		CallerBroker:            caller,
-		LogFunc:                 logFn,
 	}
 }
 

@@ -94,8 +94,7 @@ var connectCmd = &cmd{
 		d.Subprotocols = subs
 
 		conn, err := client.Dial(&d, addr, nil,
-			client.SetHandler(connMsgLogger(len(connections)+1)),
-			client.SetLogFunc(printErr))
+			client.SetHandler(connMsgLogger(len(connections)+1)))
 		if err != nil {
 			printErr("Dial failed: %v", err)
 			return

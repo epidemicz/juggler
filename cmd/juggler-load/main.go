@@ -22,7 +22,6 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/PuerkitoBio/juggler"
 	"github.com/PuerkitoBio/juggler/client"
 	"github.com/PuerkitoBio/juggler/message"
 	"github.com/gorilla/websocket"
@@ -428,7 +427,6 @@ func runClient(stats *runStats, started chan<- struct{}, stop <-chan struct{}, r
 	cli, err := client.Dial(
 		&websocket.Dialer{Subprotocols: []string{stats.Protocol}},
 		stats.Addr, nil,
-		client.SetLogFunc(juggler.DiscardLog),
 		client.SetHandler(client.HandlerFunc(func(ctx context.Context, m message.Msg) {
 			switch m.Type() {
 			case message.ResMsg:
