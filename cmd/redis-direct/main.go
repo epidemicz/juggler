@@ -1,3 +1,8 @@
+// Command redis-direct implements different load-testing scenarios against
+// a redis database, to determine the upper limit that juggler could
+// theoretically reach. The scenario closest to jugger is the -e 4, which
+// marshals/unmarshals a JSON payload and sets a timeout key via a script
+// along with pushing/popping the call to the redis list.
 package main
 
 import (

@@ -1,5 +1,5 @@
 // Package callee implements the Callee type to use to listen for
-// and process call requests. A callee listens to some URIs using
+// and process RPC call requests. A callee listens to some URIs using
 // a broker.CalleeBroker, and stores the result of the calls so that
 // the broker can send it back to the calling client.
 package callee

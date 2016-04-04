@@ -1,5 +1,5 @@
 // Package client implements a juggler client. Once a Client is
-// returned via a call to Dial, it can be used to make calls to an
+// returned via a call to Dial or New, it can be used to make calls to an
 // RPC function identified by a URI, to subscribe to and unsubscribe
 // from pub-sub channels, and to publish events to a pub-sub channel.
 //
@@ -10,6 +10,7 @@
 // RPC call that succeeded (that is, for which the server returned
 // an ACK message, not a NACK) either generates a RES or an EXP,
 // but never both or none.
+//
 package client
 
 import (
@@ -53,10 +54,10 @@ type Client struct {
 	err     error
 }
 
-// NewClient creates a juggler client using the provided websocket
+// New creates a juggler client using the provided websocket
 // connection. Received messages are sent to the handler set by
 // the SetHandler option.
-func NewClient(conn *websocket.Conn, opts ...Option) *Client {
+func New(conn *websocket.Conn, opts ...Option) *Client {
 	// wmu is the write lock, used as mutex so it can be select'ed upon.
 	// start with an available slot (initialize with a sent value).
 	wmu := make(chan struct{}, 1)
@@ -121,7 +122,7 @@ func (c *Client) handleMessages() {
 // succeeds, it returns the initialized client, otherwise it returns an
 // error. It does not allow handling redirections and such, for a better
 // control over the connection, directly use the *websocket.Dialer and
-// create the client once the connection is established, using NewClient.
+// create the client once the connection is established, using New.
 //
 // The Dialer's Subprotocols field should be set to one of (or any/all of)
 // juggler.Subprotocol. To limit the client to a restricted subset of
@@ -132,7 +133,7 @@ func Dial(d *websocket.Dialer, urlStr string, reqHeader http.Header, opts ...Opt
 	if err != nil {
 		return nil, err
 	}
-	return NewClient(conn, opts...), nil
+	return New(conn, opts...), nil
 }
 
 // Close closes the connection. No more messages will be received.

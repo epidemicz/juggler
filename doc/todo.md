@@ -1,6 +1,7 @@
 # juggler
 
 TODO :
+* remove LogFunc from server, broker?
 * document root juggler package (godoc)
 * better test coverage
 * README/License and blog article

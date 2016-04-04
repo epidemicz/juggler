@@ -1,5 +1,5 @@
-// Command juggler-client is an interactive tool to send commands to
-// a juggler server.
+// Command juggler-client is an interactive command-line tool to send
+// commands to a juggler server.
 package main
 
 import (

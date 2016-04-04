@@ -1,5 +1,5 @@
-// Command juggler-direct-call implements a caller that directly sends
-// to redis, without a server and a client. It is for testing the
+// Command juggler-direct-call implements a test caller that directly sends
+// to redis, without a server and a client. It is used for testing the
 // throughput of a callee without going through the whole layers.
 package main
 

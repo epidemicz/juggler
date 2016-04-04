@@ -1,5 +1,5 @@
 // Command juggler-callee implements a testing callee that provides
-// simple URI functions.
+// simple test RPC URI endpoints.
 //
 //     - test.echo (string) : returns the received string
 //     - test.reverse (string) : reverses each rune in the received string
