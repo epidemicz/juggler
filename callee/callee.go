@@ -28,6 +28,9 @@ type Thunk func(*message.CallPayload) (interface{}, error)
 
 // Callee is a peer that handles call requests for some URIs.
 type Callee struct {
+	// prevent unkeyed literals
+	_ struct{}
+
 	// Broker is the callee broker to use to listen for call requests
 	// and to store results.
 	Broker broker.CalleeBroker

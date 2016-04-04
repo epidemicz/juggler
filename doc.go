@@ -27,9 +27,38 @@
 // HTTP connection to a websocket connection, and serves it using the
 // provided Server.
 //
+// Because HTTP/2 does not support websockets, the HTTP server used
+// to run the juggler server must not use HTTP/2. Since Go1.6, HTTP/2
+// is automatically enabled over HTTPS. See https://golang.org/doc/go1.6#http2
+// for details on how to explicitly disable it.
+//
 // Conn
 //
+// The Conn struct represents a websocket connection to a juggler
+// server. To be accepted by the server, the connection must accept
+// one of the subprotocols supported by the server (the Subprotocols
+// package variable). The negociated subprotocol is available via
+// the Subprotocol connection method.
+//
+// A connection listens for its RPC call results, pub-sub events and
+// requests from the client end, and ensures the messages flow from client to
+// server and back as needed.
+//
+// Some client connections may know ahead of time that they won't make
+// any RPC calls, or won't subscribe to any pub-sub channel, etc. In that
+// case, the Juggler-Allowed-Messages header can be set on the HTTP
+// request that initiates the connection with a restricted list of allowed
+// messages, e.g.:
+//
+//     http.Header{"Juggler-Allowed-Messages": {"call, pub"}}
+//
+// The value is a comma-separated list of allowed messages. When that header
+// is non-empty and not *, only the specified messages are allowed. This
+// leads to a more efficient server-side connection and ensures the
+// connection behaves as advertised, otherwise the connection is closed.
+//
+// Handler
 //
 //
-// TODO : more and better doc here, + readme + license
+//
 package juggler

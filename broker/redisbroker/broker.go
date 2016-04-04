@@ -59,6 +59,9 @@ type Pool interface {
 // Broker is a broker that provides the methods to
 // interact with Redis using the juggler protocol.
 type Broker struct {
+	// prevent unkeyed literals
+	_ struct{}
+
 	// Pool is the redis pool or redisc cluster to use to get
 	// short-lived connections.
 	Pool Pool

@@ -36,6 +36,9 @@ func isInStr(list []string, v string) bool {
 // The fields should not be updated once a server has started
 // serving connections.
 type Server struct {
+	// prevent unkeyed literals
+	_ struct{}
+
 	// ReadLimit defines the maximum size, in bytes, of incoming
 	// messages. If a client sends a message that exceeds this limit,
 	// the connection is closed. The default of 0 means no limit.
