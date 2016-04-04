@@ -55,7 +55,7 @@ func LogConn(logFn func(string, ...interface{})) func(*juggler.Conn, juggler.Con
 		switch state {
 		case juggler.Connected:
 			logFn("%v: connected from %v with subprotocol %q", c.UUID, c.RemoteAddr(), c.Subprotocol())
-		case juggler.Closing:
+		case juggler.Closed:
 			logFn("%v: closing from %v with error %v", c.UUID, c.RemoteAddr(), c.CloseErr)
 		}
 	}

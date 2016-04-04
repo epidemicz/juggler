@@ -71,9 +71,9 @@ func TestServerServe(t *testing.T) {
 
 	select {
 	case got = <-state:
-		assert.Equal(t, juggler.Closing, got, "received closing connection state")
+		assert.Equal(t, juggler.Closed, got, "received closed connection state")
 	case <-time.After(100 * time.Millisecond):
-		assert.Fail(t, "no closing state received")
+		assert.Fail(t, "no closed state received")
 	}
 }
 

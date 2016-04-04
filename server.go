@@ -64,16 +64,16 @@ type Server struct {
 
 	// ConnState specifies an optional callback function that is called
 	// when a connection changes state. If non-nil, it is called for
-	// Accepting, Connected and Closing states. Closing means closing the
-	// juggler connection, the underlying websocket connection may stay
-	// connected. It is safe to access the connection's CloseErr field
-	// in the Closing state.
+	// Accepting, Connected and Closed states. Closed means the
+	// juggler connection is closed, the underlying websocket connection
+	// may stay connected. It is safe to access the connection's
+	// CloseErr field in the Closed state.
 	//
 	// The possible state transitions are:
 	//
-	//     Accepting -> Closing (if the server failed to setup the connection)
+	//     Accepting -> Closed (if the server failed to setup the connection)
 	//     Accepting -> Connected
-	//     Connected -> Closing
+	//     Connected -> Closed
 	ConnState func(*Conn, ConnState)
 
 	// Handler is the handler that is called when a message is
@@ -127,7 +127,7 @@ func (srv *Server) ServeConn(conn *websocket.Conn, allowedMsgs ...message.Type) 
 	// start lifecycle - Accepting, and ensure Closing is called on exit
 	if cs := srv.ConnState; cs != nil {
 		defer func() {
-			cs(c, Closing)
+			cs(c, Closed)
 		}()
 		cs(c, Accepting)
 	}

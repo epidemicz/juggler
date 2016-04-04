@@ -24,7 +24,7 @@ const (
 	Unknown ConnState = iota
 	Accepting
 	Connected
-	Closing
+	Closed
 )
 
 // Conn is a juggler connection. Each connection is identified by
