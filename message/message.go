@@ -4,9 +4,9 @@
 // The juggler.0 protocol defines the following messages for the client:
 //
 //     - CALL : to call an RPC function
-//     - SUB  : to subscribe to a pub/sub channel
-//     - UNSB : to unsubscribe from a pub/sub channel
-//     - PUB  : to publish to a pub/sub channel
+//     - SUB  : to subscribe to a pub-sub channel
+//     - UNSB : to unsubscribe from a pub-sub channel
+//     - PUB  : to publish to a pub-sub channel
 //
 // And the following messages for the server:
 //
@@ -265,7 +265,7 @@ func NewPub(channel string, args interface{}) (*Pub, error) {
 
 // Nack is an negative-acknowledge message. It indicates the source
 // message that failed to be delivered in the For (and ForType)
-// fields. A Nack is sent only when a Pub-Sub or RPC request failed
+// fields. A Nack is sent only when a pub-sub or RPC request failed
 // to be processed properly - notably, it is not sent if the result
 // of a call was processed by the callee but resulted in an error.
 // This would be returned by a Res message.

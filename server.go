@@ -159,7 +159,7 @@ func (srv *Server) ServeConn(conn *websocket.Conn, allowedMsgs ...message.Type) 
 		cs(c, Connected)
 	}
 
-	// receive, results, pub/sub loops
+	// receive, results, pub-sub loops
 	if subOK {
 		// can't receive events unless SUB is allowed
 		go c.pubSub()

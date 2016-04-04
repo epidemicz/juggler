@@ -41,7 +41,7 @@ In order to keep the juggler core small and focused, this feature is not provide
 
 In the worst case, an inactive URI would be reported as "live" for the TTL of the key (if the callee dies just after having set the expiration of the key). Multiple callees can listen for the same URI without problem, and it would stop being reported as "live" only when the last callee stops listening. The dynamic discovery is somewhat more complex in a redis-cluster (it would require a SCAN on each node, see https://github.com/antirez/redis-doc/issues/286).
 
-The downside is that the dynamic reporting and whitelisting of calls only works if the calls go through the server's middleware handler, but that's ok because the best practice even for internal components is to interact with other peers (call an RPC function, publish an event, etc.) via the server, using a juggler client, so that there's no coupling with anything else, and so that the application's middleware control all accesses to RPC and Pub-Sub.
+The downside is that the dynamic reporting and whitelisting of calls only works if the calls go through the server's middleware handler, but that's ok because the best practice even for internal components is to interact with other peers (call an RPC function, publish an event, etc.) via the server, using a juggler client, so that there's no coupling with anything else, and so that the application's middleware control all accesses to RPC and pub-sub.
 
 ## Use of JSON as serialization format
 

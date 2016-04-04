@@ -2,7 +2,7 @@
 
 It's still way too early to dare make any best practice recommendations, except for one.
 
-## All RPC and Pub-Sub calls must go through the server
+## All RPC and pub-sub calls must go through the server
 
 The core of an application's security is handled by the juggler server's middleware handlers (authentication, authorization, rate limiting, URI whitelisting, etc.). If an internal component (e.g. a worker process that listens on a message queue) needs to emit events or call RPC functions, it should connect to the juggler server as a client and use that connection to make requests.
 
