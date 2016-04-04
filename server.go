@@ -66,7 +66,8 @@ type Server struct {
 	// when a connection changes state. If non-nil, it is called for
 	// Accepting, Connected and Closing states. Closing means closing the
 	// juggler connection, the underlying websocket connection may stay
-	// connected.
+	// connected. It is safe to access the connection's CloseErr field
+	// in the Closing state.
 	//
 	// The possible state transitions are:
 	//

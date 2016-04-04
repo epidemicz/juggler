@@ -6,7 +6,6 @@ The `juggler.Server` and the `redisbroker.Broker` types both have a `Vars` field
 
 On the server, the following metrics are collected:
 
-* RecoveredPanics : incremented when a panic is recovered in the `juggler.PanicRecover` handler.
 * Msgs : incremented for each message sent or received by the server in `juggler.ProcessMessage`.
 * MsgsRead : incremented for each read message received by the server in `juggler.ProcessMessage`.
 * MsgsWrite : incremented for each write message sent by the server in `juggler.ProcessMessage`.

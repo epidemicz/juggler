@@ -22,7 +22,9 @@ func Chain(hs ...juggler.Handler) juggler.Handler {
 }
 
 // PanicRecover returns a juggler.Handler that recovers from panics that
-// may happen in h. The connection is closed on a panic.
+// may happen in h. The connection is closed on a panic. If a non-nil
+// vars is passed as parameter, the RecoveredPanics counter is incremented
+// for each panic.
 func PanicRecover(h juggler.Handler, vars *expvar.Map) juggler.Handler {
 	return juggler.HandlerFunc(func(ctx context.Context, c *juggler.Conn, m message.Msg) {
 		defer func() {
