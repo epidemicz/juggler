@@ -10,6 +10,7 @@ import (
 
 	"github.com/PuerkitoBio/juggler/internal/jugglertest"
 	"github.com/PuerkitoBio/juggler/internal/wstest"
+	"github.com/PuerkitoBio/juggler/internal/wswriter"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -64,7 +65,7 @@ func TestExclusiveWriter(t *testing.T) {
 		<-syncE
 		_, err := fmt.Fprint(w, "e")
 		if assert.Error(t, err, "write e") {
-			assert.Equal(t, ErrWriteLockTimeout, err, "write e exceeded")
+			assert.Equal(t, wswriter.ErrWriteLockTimeout, err, "write e exceeded")
 		}
 		require.NoError(t, w.Close(), "close e")
 	}()

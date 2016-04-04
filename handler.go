@@ -197,24 +197,13 @@ func ProcessMsg(ctx context.Context, c *Conn, m message.Msg) {
 func doWrite(c *Conn, m message.Msg, addFn func(string, int64)) {
 	if err := writeMsg(c, m); err != nil {
 		switch err {
-		case ErrWriteLockTimeout:
+		case wswriter.ErrWriteLockTimeout:
 			addFn("WriteLockTimeouts", 1)
-			c.Close(fmt.Errorf("writeMsg failed: %v; closing connection", err))
+			c.Close(err)
 
 		case wswriter.ErrWriteLimitExceeded:
 			addFn("WriteLimitExceeded", 1)
-			logf(c.srv.LogFunc, "%v: writeMsg %v failed: %v", c.UUID, m.UUID(), err)
-
-			// no good http code for this case
-			if err := writeMsg(c, message.NewNack(m, 599, err)); err != nil {
-				if err == ErrWriteLockTimeout {
-					addFn("WriteLockTimeouts", 1)
-					c.Close(fmt.Errorf("writeMsg failed: %v; closing connection", err))
-				} else {
-					logf(c.srv.LogFunc, "%v: writeMsg %v for write limit exceeded notification failed: %v", c.UUID, m.UUID(), err)
-				}
-				return
-			}
+			c.Close(err)
 
 		default:
 			logf(c.srv.LogFunc, "%v: writeMsg %v failed: %v", c.UUID, m.UUID(), err)

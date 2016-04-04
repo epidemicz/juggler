@@ -44,7 +44,7 @@ type Conn struct {
 	// allowed types of messages from the client (empty means any)
 	allowedMsgs []message.Type
 
-	wmu  chan struct{} // write lock
+	wmu  chan struct{} // exclusive write lock
 	srv  *Server
 	psc  broker.PubSubConn  // single pub-sub-dedicated broker connection
 	resc broker.ResultsConn // single results-dedicated broker connection
@@ -116,10 +116,6 @@ func (c *Conn) Close(err error) {
 	})
 }
 
-// ErrWriteLockTimeout is the error returned when the writer returned
-// by Conn.Writer fails to acquire the write lock in the given time.
-var ErrWriteLockTimeout = wswriter.ErrWriteLockTimeout
-
 // Writer returns an io.WriteCloser that can be used to send a
 // message on the connection. Only one writer can be active at
 // any moment for a given connection, so the returned writer
@@ -127,7 +123,7 @@ var ErrWriteLockTimeout = wswriter.ErrWriteLockTimeout
 // release it only when Close is called. The timeout controls
 // the time to wait to acquire the lock on the first call to
 // Write. If the lock cannot be acquired within that time,
-// ErrWriteLockTimeout is returned and no write is performed.
+// an error is returned and no write is performed.
 //
 // It is possible to enter a deadlock state if Writer is called
 // with no timeout, an initial Write is executed, and Writer is

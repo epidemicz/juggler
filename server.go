@@ -51,9 +51,8 @@ type Server struct {
 	ReadTimeout time.Duration
 
 	// WriteLimit defines the maximum size, in bytes, of outgoing
-	// messages. If a message exceeds this limit, it is dropped and
-	// a NACK message is sent to the client instead. The default of 0
-	// means no limit.
+	// messages. If a message exceeds this limit, the connection is
+	// closed. The default of 0 means no limit.
 	WriteLimit int64
 
 	// WriteTimeout is the timeout to write an outgoing message. It is
