@@ -15,6 +15,7 @@ package client
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"sync"
@@ -23,6 +24,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/PuerkitoBio/juggler/broker"
+	"github.com/PuerkitoBio/juggler/internal/wswriter"
 	"github.com/PuerkitoBio/juggler/message"
 	"github.com/gorilla/websocket"
 	"github.com/pborman/uuid"
@@ -31,11 +33,12 @@ import (
 // Client is a juggler client based on a websocket connection. It is
 // used to send and receive messages to and from a juggler server.
 type Client struct {
-	callTimeout time.Duration
-	handler     Handler
-	logFunc     func(string, ...interface{})
-	conn        *websocket.Conn
+	conn *websocket.Conn
 
+	// options
+	callTimeout             time.Duration
+	handler                 Handler
+	logFunc                 func(string, ...interface{})
 	readTimeout             time.Duration
 	writeTimeout            time.Duration
 	acquireWriteLockTimeout time.Duration
@@ -54,9 +57,15 @@ type Client struct {
 // connection. Received messages are sent to the handler set by
 // the SetHandler option.
 func NewClient(conn *websocket.Conn, opts ...Option) *Client {
+	// wmu is the write lock, used as mutex so it can be select'ed upon.
+	// start with an available slot (initialize with a sent value).
+	wmu := make(chan struct{}, 1)
+	wmu <- struct{}{}
+
 	c := &Client{
 		conn:    conn,
 		stop:    make(chan struct{}),
+		wmu:     wmu,
 		results: make(map[string]struct{}),
 	}
 	for _, opt := range opts {
@@ -186,7 +195,7 @@ func (c *Client) Call(uri string, v interface{}, timeout time.Duration) (uuid.UU
 	if err != nil {
 		return nil, err
 	}
-	if err := c.conn.WriteJSON(m); err != nil {
+	if err := c.doWrite(m); err != nil {
 		return nil, err
 	}
 
@@ -246,7 +255,7 @@ func (c *Client) Sub(channel string, pattern bool) (uuid.UUID, error) {
 	}
 
 	m := message.NewSub(channel, pattern)
-	if err := c.conn.WriteJSON(m); err != nil {
+	if err := c.doWrite(m); err != nil {
 		return nil, err
 	}
 	return m.UUID(), nil
@@ -265,7 +274,7 @@ func (c *Client) Unsb(channel string, pattern bool) (uuid.UUID, error) {
 	}
 
 	m := message.NewUnsb(channel, pattern)
-	if err := c.conn.WriteJSON(m); err != nil {
+	if err := c.doWrite(m); err != nil {
 		return nil, err
 	}
 	return m.UUID(), nil
@@ -287,10 +296,37 @@ func (c *Client) Pub(channel string, v interface{}) (uuid.UUID, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := c.conn.WriteJSON(m); err != nil {
+	if err := c.doWrite(m); err != nil {
 		return nil, err
 	}
 	return m.UUID(), nil
+}
+
+// doWrite calls writeMsg and handles errors so that the connection is
+// marked as failed if the error is fatal.
+func (c *Client) doWrite(m message.Msg) error {
+	err := c.writeMsg(m)
+	switch err {
+	case wswriter.ErrWriteLimitExceeded,
+		wswriter.ErrWriteLockTimeout:
+		c.mu.Lock()
+		if c.err == nil {
+			c.err = err
+		}
+		c.mu.Unlock()
+	}
+	return err
+}
+
+func (c *Client) writeMsg(m message.Msg) error {
+	w := wswriter.Exclusive(c.conn, c.wmu, c.acquireWriteLockTimeout, c.writeTimeout)
+	defer w.Close()
+
+	lw := io.Writer(w)
+	if l := c.writeLimit; l > 0 {
+		lw = wswriter.Limit(w, l)
+	}
+	return json.NewEncoder(lw).Encode(m)
 }
 
 // Handler defines the method required to handle a message received
@@ -355,7 +391,8 @@ func SetWriteTimeout(timeout time.Duration) Option {
 }
 
 // SetAcquireWriteLockTimeout sets the timeout to acquire the exclusive
-// write lock.
+// write lock. If a lock cannot be acquired before the timeout, the connection
+// is marked as failed and should be closed.
 func SetAcquireWriteLockTimeout(timeout time.Duration) Option {
 	return func(c *Client) {
 		c.acquireWriteLockTimeout = timeout
@@ -363,7 +400,8 @@ func SetAcquireWriteLockTimeout(timeout time.Duration) Option {
 }
 
 // SetReadLimit sets the limit in bytes of messages read from the connection.
-// If a message exceeds the limit, the connection is closed.
+// If a message exceeds the limit, the connection is marked as failed and
+// should be closed.
 func SetReadLimit(limit int64) Option {
 	return func(c *Client) {
 		c.conn.SetReadLimit(limit)
@@ -371,7 +409,8 @@ func SetReadLimit(limit int64) Option {
 }
 
 // SetWriteLimit sets the limit in bytes of messages sent on the connection.
-// If a message exceeds the limit, the connection is closed.
+// If a message exceeds the limit, the connection is marked as failed and
+// should be closed.
 func SetWriteLimit(limit int64) Option {
 	return func(c *Client) {
 		c.writeLimit = limit

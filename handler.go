@@ -219,8 +219,5 @@ func writeMsg(c *Conn, m message.Msg) error {
 	if l := c.srv.WriteLimit; l > 0 {
 		lw = wswriter.Limit(w, l)
 	}
-	if err := json.NewEncoder(lw).Encode(m); err != nil {
-		return err
-	}
-	return nil
+	return json.NewEncoder(lw).Encode(m)
 }

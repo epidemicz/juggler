@@ -32,6 +32,7 @@ func TestClientClose(t *testing.T) {
 
 	_, err = cli.Call("a", "b", 0)
 	require.NoError(t, err, "Call")
+
 	require.NoError(t, cli.Close(), "Close")
 	if err := cli.Close(); assert.Error(t, err, "Close") {
 		assert.Contains(t, err.Error(), "closed connection", "2nd Close")

@@ -31,7 +31,7 @@ type exclusiveWriter struct {
 // if it can't acquire one before acquireTimeout. The writeTimeout is
 // used to set the write deadline on the connection, and conn is the
 // websocket connection to write to.
-func Exclusive(conn *websocket.Conn, lock chan struct{}, acquireTimeout time.Duration, writeTimeout time.Duration) io.WriteCloser {
+func Exclusive(conn *websocket.Conn, lock chan struct{}, acquireTimeout, writeTimeout time.Duration) io.WriteCloser {
 	return &exclusiveWriter{
 		writeLock:    lock,
 		lockTimeout:  acquireTimeout,
