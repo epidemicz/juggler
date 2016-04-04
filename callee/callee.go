@@ -7,7 +7,6 @@ package callee
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"time"
 
 	"github.com/PuerkitoBio/juggler/broker"
@@ -32,10 +31,6 @@ type Callee struct {
 	// Broker is the callee broker to use to listen for call requests
 	// and to store results.
 	Broker broker.CalleeBroker
-
-	// LogFunc is the logging function to use. If nil, log.Printf
-	// is used. It can be set to juggler.DiscardLog to disable logging.
-	LogFunc func(string, ...interface{})
 }
 
 // InvokeAndStoreResult processes the provided call payload by calling
@@ -89,10 +84,8 @@ func (c *Callee) Listen(m map[string]Thunk) error {
 	for cp := range conn.Calls() {
 		if err := c.InvokeAndStoreResult(cp, m[cp.URI]); err != nil {
 			if err == ErrCallExpired {
-				logf(c.LogFunc, "dropping expired message %v", cp.MsgUUID)
 				continue
 			}
-			logf(c.LogFunc, "storeResult failed for message %v: %v", cp.MsgUUID, err)
 			continue
 		}
 	}
@@ -123,12 +116,4 @@ func (c *Callee) storeResult(cp *message.CallPayload, v interface{}, e error, ti
 		Args:     b,
 	}
 	return c.Broker.Result(rp, timeout)
-}
-
-func logf(fn func(string, ...interface{}), s string, args ...interface{}) {
-	if fn != nil {
-		fn(s, args...)
-	} else {
-		log.Printf(s, args...)
-	}
 }

@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/PuerkitoBio/juggler"
 	"github.com/PuerkitoBio/juggler/broker"
 	"github.com/PuerkitoBio/juggler/message"
 	"github.com/pborman/uuid"
@@ -81,7 +80,7 @@ func TestCallee(t *testing.T) {
 		{ConnUUID: cuid, MsgUUID: brk.cps[3].MsgUUID, URI: "err", Args: b},
 	}
 
-	cle := &Callee{Broker: brk, LogFunc: juggler.DiscardLog}
+	cle := &Callee{Broker: brk}
 	err = cle.Listen(map[string]Thunk{
 		"ok":  okThunk,
 		"err": errThunk,
