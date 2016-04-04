@@ -42,6 +42,10 @@ var (
 	_ broker.PubSubBroker = (*Broker)(nil)
 )
 
+// DiscardLog is a no-op logging function that can be used as Broker.LogFunc
+// to disable logging.
+var DiscardLog = func(_ string, _ ...interface{}) {}
+
 // Pool defines the methods required for a redis pool that provides
 // a method to get a connection and to release the pool's resources.
 type Pool interface {
@@ -69,7 +73,7 @@ type Broker struct {
 	BlockingTimeout time.Duration
 
 	// LogFunc is the logging function to use. If nil, log.Printf
-	// is used. It can be set to juggler.DiscardLog to disable logging.
+	// is used. It can be set to DiscardLog to disable logging.
 	LogFunc func(string, ...interface{})
 
 	// CallCap is the capacity of the CALL queue per URI. If it is
