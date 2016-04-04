@@ -138,7 +138,7 @@ var ErrWriteLockTimeout = wswriter.ErrWriteLockTimeout
 // The returned writer itself is not safe for concurrent use, but
 // as all Conn methods, Writer can be called concurrently.
 func (c *Conn) Writer(timeout time.Duration) io.WriteCloser {
-	return wswriter.New(
+	return wswriter.Exclusive(
 		c.wsConn,
 		c.wmu,
 		timeout,

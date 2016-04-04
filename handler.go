@@ -2,7 +2,6 @@ package juggler
 
 import (
 	"encoding/json"
-	"errors"
 	"expvar"
 	"fmt"
 	"io"
@@ -11,6 +10,7 @@ import (
 
 	"golang.org/x/net/context"
 
+	"github.com/PuerkitoBio/juggler/internal/wswriter"
 	"github.com/PuerkitoBio/juggler/message"
 )
 
@@ -201,7 +201,7 @@ func doWrite(c *Conn, m message.Msg, addFn func(string, int64)) {
 			addFn("WriteLockTimeouts", 1)
 			c.Close(fmt.Errorf("writeMsg failed: %v; closing connection", err))
 
-		case errWriteLimitExceeded:
+		case wswriter.ErrWriteLimitExceeded:
 			addFn("WriteLimitExceeded", 1)
 			logf(c.srv.LogFunc, "%v: writeMsg %v failed: %v", c.UUID, m.UUID(), err)
 
@@ -222,37 +222,13 @@ func doWrite(c *Conn, m message.Msg, addFn func(string, int64)) {
 	}
 }
 
-var errWriteLimitExceeded = errors.New("write limit exceeded")
-
-type limitedWriter struct {
-	w io.Writer
-	n int64
-}
-
-const minWriteLimit = 4096
-
-func limitWriter(w io.Writer, limit int64) io.Writer {
-	if limit < minWriteLimit {
-		limit = minWriteLimit
-	}
-	return &limitedWriter{w: w, n: limit}
-}
-
-func (w *limitedWriter) Write(p []byte) (int, error) {
-	w.n -= int64(len(p))
-	if w.n < 0 {
-		return 0, errWriteLimitExceeded
-	}
-	return w.w.Write(p)
-}
-
 func writeMsg(c *Conn, m message.Msg) error {
 	w := c.Writer(c.srv.AcquireWriteLockTimeout)
 	defer w.Close()
 
 	lw := io.Writer(w)
 	if l := c.srv.WriteLimit; l > 0 {
-		lw = limitWriter(w, l)
+		lw = wswriter.Limit(w, l)
 	}
 	if err := json.NewEncoder(lw).Encode(m); err != nil {
 		return err

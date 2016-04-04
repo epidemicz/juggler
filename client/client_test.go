@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -33,11 +34,54 @@ func TestClientClose(t *testing.T) {
 	require.NoError(t, err, "Call")
 	require.NoError(t, cli.Close(), "Close")
 	if err := cli.Close(); assert.Error(t, err, "Close") {
-		assert.Contains(t, err.Error(), "use of closed network connection", "2nd Close")
+		assert.Contains(t, err.Error(), "closed connection", "2nd Close")
 
 		if _, err := cli.Call("c", "d", 0); assert.Error(t, err, "Call after Close") {
-			assert.Contains(t, err.Error(), "use of closed network connection", "2nd Close")
+			assert.Contains(t, err.Error(), "closed connection", "2nd Close")
 		}
+
+		if err := cli.Close(); assert.Error(t, err, "3rd Close") {
+			assert.Contains(t, err.Error(), "closed connection", "3rd Close")
+		}
+	}
+}
+
+func TestClientReadLimit(t *testing.T) {
+	done := make(chan bool, 1)
+	sent := make(chan int)
+	srv := wstest.StartServer(t, done, func(c *websocket.Conn) {
+		var m map[string]interface{}
+		// read the CALL message
+		require.NoError(t, c.ReadJSON(&m), "ReadJSON")
+
+		// write too many bytes
+		w, err := c.NextWriter(websocket.TextMessage)
+		require.NoError(t, err, "NextWriter")
+		_, err = io.Copy(w, io.LimitReader(rand.Reader, 100))
+		require.NoError(t, err, "io.Copy")
+		sent <- 1
+	})
+	defer srv.Close()
+
+	h := HandlerFunc(func(ctx context.Context, m message.Msg) {})
+	cli, err := Dial(&websocket.Dialer{}, srv.URL, nil, SetHandler(h), SetReadLimit(90), SetLogFunc((&jugglertest.DebugLog{T: t}).Printf))
+	require.NoError(t, err, "Dial")
+
+	// Make a call request, should succeed, but trigger an error
+	_, err = cli.Call("a", "payload", time.Second)
+	assert.NoError(t, err, "Call")
+	<-sent
+	// wait for the response to arrive :(
+	time.Sleep(100 * time.Millisecond)
+
+	// Close returns the error
+	err = cli.Close()
+	if assert.Error(t, err, "Close") {
+		assert.NotContains(t, err.Error(), "closed connection", "not a normal closed connection error")
+
+		// Future calls return the same error
+		_, err2 := cli.Call("a", "payload", time.Second)
+		assert.Equal(t, err, err2, "Call fails with same error")
 	}
 }
 

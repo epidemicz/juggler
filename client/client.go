@@ -14,6 +14,7 @@ package client
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"sync"
@@ -33,12 +34,20 @@ type Client struct {
 	callTimeout time.Duration
 	handler     Handler
 	logFunc     func(string, ...interface{})
+	conn        *websocket.Conn
 
-	wg      sync.WaitGroup // wait for handleMessages goroutine
-	stop    chan struct{}  // stop signal for expiration goroutines
-	conn    *websocket.Conn
-	mu      sync.Mutex // lock access to results map
+	readTimeout             time.Duration
+	writeTimeout            time.Duration
+	acquireWriteLockTimeout time.Duration
+	writeLimit              int64
+
+	// stop signal for expiration goroutines, signals close of client
+	stop chan struct{}
+
+	wmu     chan struct{} // exclusive write lock
+	mu      sync.Mutex    // lock access to results map and err field
 	results map[string]struct{}
+	err     error
 }
 
 // NewClient creates a juggler client using the provided websocket
@@ -53,20 +62,21 @@ func NewClient(conn *websocket.Conn, opts ...Option) *Client {
 	for _, opt := range opts {
 		opt(c)
 	}
-	c.wg.Add(1)
 	go c.handleMessages()
 	return c
 }
 
 func (c *Client) handleMessages() {
-	defer func() {
-		close(c.stop)
-		c.wg.Done()
-	}()
+	defer close(c.stop)
 
 	for {
 		_, r, err := c.conn.NextReader()
 		if err != nil {
+			c.mu.Lock()
+			if c.err == nil {
+				c.err = err
+			}
+			c.mu.Unlock()
 			logf(c.logFunc, "client: NextReader failed: %v; stopping read loop", err)
 			return
 		}
@@ -118,8 +128,26 @@ func Dial(d *websocket.Dialer, urlStr string, reqHeader http.Header, opts ...Opt
 
 // Close closes the connection. No more messages will be received.
 func (c *Client) Close() error {
-	err := c.conn.Close()
-	c.wg.Wait()
+	c.mu.Lock()
+	err := c.err
+	c.mu.Unlock()
+
+	// closing the websocket connection causes the NextReader
+	// call in handleMessages to fail, closing c.stop.
+	err2 := c.conn.Close()
+	<-c.stop
+
+	if err == nil {
+		// if c.err is nil, store the close error
+		err = err2
+		c.mu.Lock()
+		if err2 != nil {
+			c.err = err2
+		} else {
+			c.err = errors.New("closed connection")
+		}
+		c.mu.Unlock()
+	}
 	return err
 }
 
@@ -144,6 +172,13 @@ func (c *Client) UnderlyingConn() *websocket.Conn {
 // It returns the UUID of the call message on success, or an error if
 // the call request could not be sent to the server.
 func (c *Client) Call(uri string, v interface{}, timeout time.Duration) (uuid.UUID, error) {
+	c.mu.Lock()
+	err := c.err
+	c.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+
 	if timeout <= 0 {
 		timeout = c.callTimeout
 	}
@@ -203,6 +238,13 @@ func (c *Client) deletePending(key string) bool {
 // returns the UUID of the sub message on success, or an error if
 // the request could not be sent to the server.
 func (c *Client) Sub(channel string, pattern bool) (uuid.UUID, error) {
+	c.mu.Lock()
+	err := c.err
+	c.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+
 	m := message.NewSub(channel, pattern)
 	if err := c.conn.WriteJSON(m); err != nil {
 		return nil, err
@@ -215,6 +257,13 @@ func (c *Client) Sub(channel string, pattern bool) (uuid.UUID, error) {
 // returns the UUID of the unsb message on success, or an error if
 // the request could not be sent to the server.
 func (c *Client) Unsb(channel string, pattern bool) (uuid.UUID, error) {
+	c.mu.Lock()
+	err := c.err
+	c.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+
 	m := message.NewUnsb(channel, pattern)
 	if err := c.conn.WriteJSON(m); err != nil {
 		return nil, err
@@ -227,6 +276,13 @@ func (c *Client) Unsb(channel string, pattern bool) (uuid.UUID, error) {
 // the UUID of the pub message on success, or an error if the request could
 // not be sent to the server.
 func (c *Client) Pub(channel string, v interface{}) (uuid.UUID, error) {
+	c.mu.Lock()
+	err := c.err
+	c.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+
 	m, err := message.NewPub(channel, v)
 	if err != nil {
 		return nil, err
@@ -281,6 +337,44 @@ func SetHandler(h Handler) Option {
 func SetLogFunc(fn func(string, ...interface{})) Option {
 	return func(c *Client) {
 		c.logFunc = fn
+	}
+}
+
+// SetReadTimeout sets the read timeout of the connection.
+func SetReadTimeout(timeout time.Duration) Option {
+	return func(c *Client) {
+		c.readTimeout = timeout
+	}
+}
+
+// SetWriteTimeout sets the write timeout of the connection.
+func SetWriteTimeout(timeout time.Duration) Option {
+	return func(c *Client) {
+		c.writeTimeout = timeout
+	}
+}
+
+// SetAcquireWriteLockTimeout sets the timeout to acquire the exclusive
+// write lock.
+func SetAcquireWriteLockTimeout(timeout time.Duration) Option {
+	return func(c *Client) {
+		c.acquireWriteLockTimeout = timeout
+	}
+}
+
+// SetReadLimit sets the limit in bytes of messages read from the connection.
+// If a message exceeds the limit, the connection is closed.
+func SetReadLimit(limit int64) Option {
+	return func(c *Client) {
+		c.conn.SetReadLimit(limit)
+	}
+}
+
+// SetWriteLimit sets the limit in bytes of messages sent on the connection.
+// If a message exceeds the limit, the connection is closed.
+func SetWriteLimit(limit int64) Option {
+	return func(c *Client) {
+		c.writeLimit = limit
 	}
 }
 

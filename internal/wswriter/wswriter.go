@@ -1,6 +1,5 @@
-// Package wswriter implements an exclusive writer for a websocket connection.
-// It allows a single access to the writer end of the websocket connection
-// at any given time.
+// Package wswriter implements an exclusive writer and a limited writer
+// for websocket connections.
 package wswriter
 
 import (
@@ -11,14 +10,14 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// ErrWriteLockTimeout is returned when a call to Write fails
-// because the write lock of the connection cannot be acquired before
+// ErrWriteLockTimeout is returned when a Write call to an exclusive writer
+// fails because the write lock of the connection cannot be acquired before
 // the timeout.
 var ErrWriteLockTimeout = errors.New("juggler: timed out waiting for write lock")
 
-// Writer implements an io.WriteCloser that acquires the connection's write
-// lock prior to writing.
-type Writer struct {
+// exclusiveWriter implements an io.WriteCloser that acquires the
+// connection's write lock prior to writing.
+type exclusiveWriter struct {
 	w            io.WriteCloser
 	init         bool
 	writeLock    chan struct{}
@@ -27,13 +26,13 @@ type Writer struct {
 	wsConn       *websocket.Conn
 }
 
-// New creates an exclusive websocket writer. It uses the lock channel
+// Exclusive creates an exclusive websocket writer. It uses the lock channel
 // to acquire and release the lock, and fails with an ErrWriteLockTimeout
 // if it can't acquire one before acquireTimeout. The writeTimeout is
 // used to set the write deadline on the connection, and conn is the
 // websocket connection to write to.
-func New(conn *websocket.Conn, lock chan struct{}, acquireTimeout time.Duration, writeTimeout time.Duration) *Writer {
-	return &Writer{
+func Exclusive(conn *websocket.Conn, lock chan struct{}, acquireTimeout time.Duration, writeTimeout time.Duration) io.WriteCloser {
+	return &exclusiveWriter{
 		writeLock:    lock,
 		lockTimeout:  acquireTimeout,
 		writeTimeout: writeTimeout,
@@ -44,7 +43,7 @@ func New(conn *websocket.Conn, lock chan struct{}, acquireTimeout time.Duration,
 // Write writes a text message to the websocket connection. The first
 // call tries to acquire the exclusive writer lock, returning
 // ErrWriteLockTimeout if it fails doing so before the timeout.
-func (w *Writer) Write(p []byte) (int, error) {
+func (w *exclusiveWriter) Write(p []byte) (int, error) {
 	if !w.init {
 		var wait <-chan time.Time
 		if to := w.lockTimeout; to > 0 {
@@ -75,7 +74,7 @@ func (w *Writer) Write(p []byte) (int, error) {
 
 // Close finishes writing the text message to the websocket connection,
 // and releases the exclusive write lock.
-func (w *Writer) Close() error {
+func (w *exclusiveWriter) Close() error {
 	if !w.init {
 		// no write, Close is a no-op
 		return nil
@@ -92,4 +91,27 @@ func (w *Writer) Close() error {
 	// release the write lock
 	w.writeLock <- struct{}{}
 	return err
+}
+
+// ErrWriteLimitExceeded is returned when a Write call to a limited
+// writer fails because the limit is exceeded.
+var ErrWriteLimitExceeded = errors.New("write limit exceeded")
+
+type limitedWriter struct {
+	w io.Writer
+	n int64
+}
+
+// Limit returns an io.Writer that can write up to limit bytes to w.
+// Exceeding the limit fails with ErrWriteLimitExceeded.
+func Limit(w io.Writer, limit int64) io.Writer {
+	return &limitedWriter{w: w, n: limit}
+}
+
+func (w *limitedWriter) Write(p []byte) (int, error) {
+	w.n -= int64(len(p))
+	if w.n < 0 {
+		return 0, ErrWriteLimitExceeded
+	}
+	return w.w.Write(p)
 }
