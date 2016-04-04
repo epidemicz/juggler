@@ -22,6 +22,7 @@ type ConnState int
 // The list of possible connection states.
 const (
 	Unknown ConnState = iota
+	Accepting
 	Connected
 	Closing
 )
@@ -142,13 +143,13 @@ func (c *Conn) Writer(timeout time.Duration) io.WriteCloser {
 	)
 }
 
-// Send sends the message to the client. It calls the Server's
+// Send sends the message to the client. It calls the server's
 // Handler if any, or ProcessMsg if nil.
 func (c *Conn) Send(m message.Msg) {
 	if h := c.srv.Handler; h != nil {
 		h.Handle(context.Background(), c, m)
 	} else {
-		ProcessMsg(context.Background(), c, m)
+		ProcessMsg(c, m)
 	}
 }
 
@@ -225,7 +226,7 @@ func (c *Conn) receive() {
 		if h := c.srv.Handler; h != nil {
 			h.Handle(context.Background(), c, m)
 		} else {
-			ProcessMsg(context.Background(), c, m)
+			ProcessMsg(c, m)
 		}
 	}
 }

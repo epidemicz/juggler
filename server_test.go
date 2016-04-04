@@ -13,7 +13,6 @@ import (
 	"github.com/PuerkitoBio/juggler"
 	"github.com/PuerkitoBio/juggler/broker/redisbroker"
 	"github.com/PuerkitoBio/juggler/client"
-	"github.com/PuerkitoBio/juggler/internal/jugglertest"
 	"github.com/PuerkitoBio/juggler/internal/wstest"
 	"github.com/PuerkitoBio/juggler/message"
 	"github.com/PuerkitoBio/redisc/redistest"
@@ -30,12 +29,10 @@ func TestServerServe(t *testing.T) {
 	srv := wstest.StartRecordingServer(t, done, ioutil.Discard)
 	defer srv.Close()
 
-	dbgl := &jugglertest.DebugLog{T: t}
 	pool := redistest.NewPool(t, ":"+port)
 	broker := &redisbroker.Broker{
-		Pool:    pool,
-		Dial:    pool.Dial,
-		LogFunc: dbgl.Printf,
+		Pool: pool,
+		Dial: pool.Dial,
 	}
 
 	conn := wstest.Dial(t, srv.URL)
@@ -46,14 +43,21 @@ func TestServerServe(t *testing.T) {
 		select {
 		case state <- cs:
 		case <-time.After(100 * time.Millisecond):
-			assert.Fail(t, "could not sent state %d", cs)
+			assert.Fail(t, "could not send state %v", cs)
 		}
 	}
-	server := &juggler.Server{ConnState: fn, CallerBroker: broker, PubSubBroker: broker, LogFunc: dbgl.Printf}
+	server := &juggler.Server{ConnState: fn, CallerBroker: broker, PubSubBroker: broker}
 
 	go server.ServeConn(conn)
 
 	var got juggler.ConnState
+	select {
+	case got = <-state:
+		assert.Equal(t, juggler.Accepting, got, "received accepting connection state")
+	case <-time.After(100 * time.Millisecond):
+		assert.Fail(t, "no accepting state received")
+	}
+
 	select {
 	case got = <-state:
 		assert.Equal(t, juggler.Connected, got, "received connected connection state")
@@ -77,15 +81,13 @@ func TestUpgrade(t *testing.T) {
 	cmd, port := redistest.StartServer(t, nil, "")
 	defer cmd.Process.Kill()
 
-	dbgl := &jugglertest.DebugLog{T: t}
 	pool := redistest.NewPool(t, ":"+port)
 	broker := &redisbroker.Broker{
-		Pool:    pool,
-		Dial:    pool.Dial,
-		LogFunc: dbgl.Printf,
+		Pool: pool,
+		Dial: pool.Dial,
 	}
 
-	server := &juggler.Server{CallerBroker: broker, PubSubBroker: broker, LogFunc: dbgl.Printf}
+	server := &juggler.Server{CallerBroker: broker, PubSubBroker: broker}
 	upg := &websocket.Upgrader{Subprotocols: juggler.Subprotocols}
 	srv := httptest.NewServer(juggler.Upgrade(upg, server))
 	srv.URL = strings.Replace(srv.URL, "http:", "ws:", 1)
@@ -96,7 +98,7 @@ func TestUpgrade(t *testing.T) {
 	// ******* DIAL #1 ********
 	// valid subprotocol
 	// ******* DIAL #1 ********
-	cli, err := client.Dial(&websocket.Dialer{Subprotocols: juggler.Subprotocols}, srv.URL, nil, client.SetHandler(h), client.SetLogFunc(dbgl.Printf))
+	cli, err := client.Dial(&websocket.Dialer{Subprotocols: juggler.Subprotocols}, srv.URL, nil, client.SetHandler(h))
 	require.NoError(t, err, "Dial 1")
 	cli.Close()
 	select {
@@ -108,7 +110,7 @@ func TestUpgrade(t *testing.T) {
 	// ******* DIAL #2 ********
 	// invalid subprotocol, websocket connection will be closed
 	// ******* DIAL #2 ********
-	cli, err = client.Dial(&websocket.Dialer{}, srv.URL, http.Header{"Sec-WebSocket-Protocol": {"test"}}, client.SetHandler(h), client.SetLogFunc(dbgl.Printf))
+	cli, err = client.Dial(&websocket.Dialer{}, srv.URL, http.Header{"Sec-WebSocket-Protocol": {"test"}}, client.SetHandler(h))
 	require.NoError(t, err, "Dial 2")
 	// no need to call Close, Upgrade will refuse the connection
 	select {
@@ -121,7 +123,7 @@ func TestUpgrade(t *testing.T) {
 	// ******* DIAL #3 ********
 	// call with a restricted list of allowed messages
 	// ******* DIAL #3 ********
-	cli, err = client.Dial(&websocket.Dialer{Subprotocols: juggler.Subprotocols}, srv.URL, http.Header{"Juggler-Allowed-Messages": {"call, pub"}}, client.SetHandler(h), client.SetLogFunc(dbgl.Printf))
+	cli, err = client.Dial(&websocket.Dialer{Subprotocols: juggler.Subprotocols}, srv.URL, http.Header{"Juggler-Allowed-Messages": {"call, pub"}}, client.SetHandler(h))
 	require.NoError(t, err, "Dial 3")
 
 	// make a call, should work

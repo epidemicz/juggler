@@ -2,7 +2,7 @@ package juggler
 
 import (
 	"expvar"
-	"log"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -11,10 +11,6 @@ import (
 	"github.com/PuerkitoBio/juggler/message"
 	"github.com/gorilla/websocket"
 )
-
-// DiscardLog is a helper no-op function that can be assigned to
-// Server.LogFunc to disable logging.
-func DiscardLog(f string, args ...interface{}) {}
 
 // Subprotocols is the list of juggler protocol versions supported by this
 // package. It should be set as-is on the websocket.Upgrader Subprotocols
@@ -68,7 +64,15 @@ type Server struct {
 
 	// ConnState specifies an optional callback function that is called
 	// when a connection changes state. If non-nil, it is called for
-	// Connected and Closing states.
+	// Accepting, Connected and Closing states. Closing means closing the
+	// juggler connection, the underlying websocket connection may stay
+	// connected.
+	//
+	// The possible state transitions are:
+	//
+	//     Accepting -> Closing (if the server failed to setup the connection)
+	//     Accepting -> Connected
+	//     Connected -> Closing
 	ConnState func(*Conn, ConnState)
 
 	// Handler is the handler that is called when a message is
@@ -77,11 +81,6 @@ type Server struct {
 	// that it will call ProcessMsg at some point, or otherwise
 	// manually process the messages.
 	Handler Handler
-
-	// LogFunc is the function called to log events. By default,
-	// it logs using log.Printf. Logging can be disabled by setting
-	// LogFunc to DiscardLog.
-	LogFunc func(string, ...interface{})
 
 	// PubSubBroker is the broker to use for pub-sub messages. It must be
 	// set before the Server can be used.
@@ -92,8 +91,7 @@ type Server struct {
 	CallerBroker broker.CallerBroker
 
 	// Vars can be set to an *expvar.Map to collect metrics about the
-	// server. It should be set before starting to listen for
-	// connections.
+	// server.
 	Vars *expvar.Map
 }
 
@@ -125,12 +123,20 @@ func (srv *Server) ServeConn(conn *websocket.Conn, allowedMsgs ...message.Type) 
 		allowedMsgs = allReqMsgs
 	}
 
+	// start lifecycle - Accepting, and ensure Closing is called on exit
+	if cs := srv.ConnState; cs != nil {
+		defer func() {
+			cs(c, Closing)
+		}()
+		cs(c, Accepting)
+	}
+
 	// setup results connection if CALL is allowed
 	callOK := isInType(allowedMsgs, message.CallMsg)
 	if callOK {
 		resConn, err := srv.CallerBroker.NewResultsConn(c.UUID)
 		if err != nil {
-			logf(srv.LogFunc, "failed to create results connection: %v; dropping connection", err)
+			c.Close(fmt.Errorf("failed to create results connection: %v; dropping connection", err))
 			return
 		}
 		c.resc = resConn
@@ -142,19 +148,13 @@ func (srv *Server) ServeConn(conn *websocket.Conn, allowedMsgs ...message.Type) 
 	if subOK || unsbOK {
 		pubSubConn, err := srv.PubSubBroker.NewPubSubConn()
 		if err != nil {
-			logf(srv.LogFunc, "failed to create pubsub connection: %v; dropping connection", err)
+			c.Close(fmt.Errorf("failed to create pubsub connection: %v; dropping connection", err))
 			return
 		}
 		c.psc = pubSubConn
 	}
 
-	if cs := srv.ConnState; cs != nil {
-		defer func() {
-			cs(c, Closing)
-		}()
-	}
-
-	// start lifecycle of the connection
+	// switch to connected state
 	if cs := srv.ConnState; cs != nil {
 		cs(c, Connected)
 	}
@@ -199,7 +199,6 @@ func Upgrade(upgrader *websocket.Upgrader, srv *Server) http.Handler {
 
 		// the agreed-upon subprotocol must be one of the supported ones.
 		if !isInStr(Subprotocols, wsConn.Subprotocol()) {
-			logf(srv.LogFunc, "juggler: no supported subprotocol, closing connection")
 			return
 		}
 
@@ -224,12 +223,4 @@ func Upgrade(upgrader *websocket.Upgrader, srv *Server) http.Handler {
 		// this call blocks until the juggler connection is closed
 		srv.ServeConn(wsConn, msgs...)
 	})
-}
-
-func logf(fn func(string, ...interface{}), f string, args ...interface{}) {
-	if fn != nil {
-		fn(f, args...)
-	} else {
-		log.Printf(f, args...)
-	}
 }

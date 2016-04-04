@@ -198,7 +198,7 @@ func serverHandler(t *testing.T, brk broker.PubSubBroker, rc *runConfig, stats *
 	var once sync.Once
 	return juggler.HandlerFunc(func(ctx context.Context, c *juggler.Conn, m message.Msg) {
 		incStats(stats, m, m.Type().IsWrite())
-		juggler.ProcessMsg(ctx, c, m)
+		juggler.ProcessMsg(c, m)
 
 		// start sending PUB messages at the first received message
 		once.Do(func() {
@@ -343,7 +343,6 @@ func runIntegrationTest(t *testing.T, conf *IntgConfig) {
 	srv := &juggler.Server{
 		CallerBroker: brk,
 		PubSubBroker: brk,
-		LogFunc:      dbgl.Printf,
 		Handler:      serverHandler(t, brk, rc, &srvStats),
 
 		ReadLimit:               conf.ServerReadLimit,

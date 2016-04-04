@@ -3,9 +3,7 @@ package juggler
 import (
 	"encoding/json"
 	"expvar"
-	"fmt"
 	"io"
-	"runtime"
 	"time"
 
 	"golang.org/x/net/context"
@@ -17,7 +15,7 @@ import (
 // SlowProcessMsgThreshold defines the threshold at which calls to
 // ProcessMsg are marked as slow in the expvar metrics, if Server.Vars
 // is set. Set to 0 to disable SlowProcessMsg metrics.
-var SlowProcessMsgThreshold = 50 * time.Millisecond
+var SlowProcessMsgThreshold = 100 * time.Millisecond
 
 // Handler defines the method required for a server to handle a send or receive
 // of a Msg over a connection.
@@ -33,67 +31,6 @@ type HandlerFunc func(context.Context, *Conn, message.Msg)
 // function itself.
 func (h HandlerFunc) Handle(ctx context.Context, c *Conn, m message.Msg) {
 	h(ctx, c, m)
-}
-
-// Chain returns a Handler that calls the provided handlers
-// in order, one after the other.
-func Chain(hs ...Handler) Handler {
-	return HandlerFunc(func(ctx context.Context, c *Conn, m message.Msg) {
-		for _, h := range hs {
-			h.Handle(ctx, c, m)
-		}
-	})
-}
-
-// PanicRecover returns a Handler that recovers from panics that
-// may happen in h and logs the panic to the server's LogFunc. The
-// connection is closed on a panic.
-func PanicRecover(h Handler) Handler {
-	return HandlerFunc(func(ctx context.Context, c *Conn, m message.Msg) {
-		defer func() {
-			if e := recover(); e != nil {
-				if c.srv.Vars != nil {
-					c.srv.Vars.Add("RecoveredPanics", 1)
-				}
-
-				var err error
-				switch e := e.(type) {
-				case error:
-					err = e
-				default:
-					err = fmt.Errorf("%v", e)
-				}
-				c.Close(err)
-
-				logf(c.srv.LogFunc, "%v: recovered from panic %v; serving message %v %s", c.UUID, e, m.UUID(), m.Type())
-				var b [4096]byte
-				n := runtime.Stack(b[:], false)
-				logf(c.srv.LogFunc, string(b[:n]))
-			}
-		}()
-		h.Handle(ctx, c, m)
-	})
-}
-
-// LogConn is a function compatible with the Server.ConnState field
-// type that logs connections and disconnections to the server's LogFunc.
-func LogConn(c *Conn, state ConnState) {
-	switch state {
-	case Connected:
-		logf(c.srv.LogFunc, "%v: connected from %v with subprotocol %q", c.UUID, c.RemoteAddr(), c.Subprotocol())
-	case Closing:
-		logf(c.srv.LogFunc, "%v: closing from %v with error %v", c.UUID, c.RemoteAddr(), c.CloseErr)
-	}
-}
-
-// LogMsg is a HandlerFunc that logs messages received or sent on
-// c to the server's LogFunc.
-func LogMsg(ctx context.Context, c *Conn, m message.Msg) {
-	if m.Type().IsRead() {
-		logf(c.srv.LogFunc, "%v: received message %v %s", c.UUID, m.UUID(), m.Type())
-	} else if m.Type().IsWrite() {
-		logf(c.srv.LogFunc, "%v: sending message %v %s", c.UUID, m.UUID(), m.Type())
-	}
 }
 
 func saveMsgMetrics(vars *expvar.Map, m message.Msg) func() {
@@ -123,14 +60,17 @@ func saveMsgMetrics(vars *expvar.Map, m message.Msg) func() {
 	return nil
 }
 
-// ProcessMsg is a HandlerFunc that implements the default message
-// processing. For client messages, it calls the appropriate RPC
-// or pub-sub mechanisms. For server messages, it marshals
-// the message and sends it to the client.
+// ProcessMsg implements the standard message processing. For requests
+// (client-sent messages), it calls the appropriate RPC or pub-sub
+// mechanisms. For responses (server-sent messages), it marshals the
+// message and sends it to the client. If a write to the connection fails,
+// the connection is closed and the write error is stored as CloseErr
+// on the connection (unless an earlier error already caused the
+// connection to close).
 //
 // When a custom Handler is set on the Server, it should at some
 // point call ProcessMsg so the expected behaviour happens.
-func ProcessMsg(ctx context.Context, c *Conn, m message.Msg) {
+func ProcessMsg(c *Conn, m message.Msg) {
 	addFn := func(string, int64) {}
 	if c.srv.Vars != nil {
 		if fn := saveMsgMetrics(c.srv.Vars, m); fn != nil {
@@ -179,18 +119,11 @@ func ProcessMsg(ctx context.Context, c *Conn, m message.Msg) {
 		}
 		c.Send(message.NewAck(m))
 
-	case *message.Ack:
-		doWrite(c, m, addFn)
-	case *message.Nack:
-		doWrite(c, m, addFn)
-	case *message.Evnt:
-		doWrite(c, m, addFn)
-	case *message.Res:
+	case *message.Ack, *message.Nack, *message.Evnt, *message.Res:
 		doWrite(c, m, addFn)
 
 	default:
 		addFn("MsgsUnknown", 1)
-		logf(c.srv.LogFunc, "unknown message in ProcessMsg: %T", m)
 	}
 }
 
@@ -206,7 +139,8 @@ func doWrite(c *Conn, m message.Msg, addFn func(string, int64)) {
 			c.Close(err)
 
 		default:
-			logf(c.srv.LogFunc, "%v: writeMsg %v failed: %v", c.UUID, m.UUID(), err)
+			// client may be gone
+			c.Close(err)
 		}
 	}
 }

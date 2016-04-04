@@ -8,13 +8,27 @@ import (
 	"testing"
 	"time"
 
-	"github.com/PuerkitoBio/juggler/internal/jugglertest"
 	"github.com/PuerkitoBio/juggler/internal/wstest"
 	"github.com/PuerkitoBio/juggler/internal/wswriter"
+	"github.com/PuerkitoBio/juggler/message"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type fakePubSubConn struct{}
+
+func (f fakePubSubConn) Subscribe(channel string, pattern bool) error   { return nil }
+func (f fakePubSubConn) Unsubscribe(channel string, pattern bool) error { return nil }
+func (f fakePubSubConn) Events() <-chan *message.EvntPayload            { return nil }
+func (f fakePubSubConn) EventsErr() error                               { return nil }
+func (f fakePubSubConn) Close() error                                   { return nil }
+
+type fakeResultsConn struct{}
+
+func (f fakeResultsConn) Results() <-chan *message.ResPayload { return nil }
+func (f fakeResultsConn) ResultsErr() error                   { return nil }
+func (f fakeResultsConn) Close() error                        { return nil }
 
 func TestExclusiveWriter(t *testing.T) {
 	var buf bytes.Buffer
@@ -84,7 +98,7 @@ func TestExclusiveWriter(t *testing.T) {
 }
 
 func TestConnClose(t *testing.T) {
-	srv := &Server{LogFunc: (&jugglertest.DebugLog{T: t}).Printf}
+	srv := &Server{}
 	conn := newConn(&websocket.Conn{}, srv)
 	conn.psc, conn.resc = fakePubSubConn{}, fakeResultsConn{}
 
