@@ -17,7 +17,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -39,7 +38,6 @@ type Client struct {
 	// options
 	callTimeout             time.Duration
 	handler                 Handler
-	logFunc                 func(string, ...interface{})
 	readTimeout             time.Duration
 	writeTimeout            time.Duration
 	acquireWriteLockTimeout time.Duration
@@ -87,13 +85,11 @@ func (c *Client) handleMessages() {
 				c.err = err
 			}
 			c.mu.Unlock()
-			logf(c.logFunc, "client: NextReader failed: %v; stopping read loop", err)
 			return
 		}
 
 		m, err := message.UnmarshalResponse(r)
 		if err != nil {
-			logf(c.logFunc, "client: UnmarshalResponse failed: %v; skipping message", err)
 			continue
 		}
 
@@ -367,16 +363,6 @@ func SetHandler(h Handler) Option {
 	}
 }
 
-// SetLogFunc sets the function used to log errors that occur outside
-// the handler calls, such as when a message fails to be unmarshaled.
-// If nil, it logs using log.Printf. It can be set to juggler.DiscardLog
-// to disable logging.
-func SetLogFunc(fn func(string, ...interface{})) Option {
-	return func(c *Client) {
-		c.logFunc = fn
-	}
-}
-
 // SetReadTimeout sets the read timeout of the connection.
 func SetReadTimeout(timeout time.Duration) Option {
 	return func(c *Client) {
@@ -443,12 +429,4 @@ func newExp(m *message.Call) *Exp {
 	exp.Payload.URI = m.Payload.URI
 	exp.Payload.Args = m.Payload.Args
 	return exp
-}
-
-func logf(fn func(string, ...interface{}), f string, args ...interface{}) {
-	if fn != nil {
-		fn(f, args...)
-	} else {
-		log.Printf(f, args...)
-	}
 }

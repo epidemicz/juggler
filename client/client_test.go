@@ -12,7 +12,6 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/PuerkitoBio/juggler/internal/jugglertest"
 	"github.com/PuerkitoBio/juggler/internal/wstest"
 	"github.com/PuerkitoBio/juggler/message"
 	"github.com/gorilla/websocket"
@@ -27,7 +26,7 @@ func TestClientClose(t *testing.T) {
 	defer srv.Close()
 
 	h := HandlerFunc(func(ctx context.Context, m message.Msg) {})
-	cli, err := Dial(&websocket.Dialer{}, srv.URL, nil, SetHandler(h), SetLogFunc((&jugglertest.DebugLog{T: t}).Printf))
+	cli, err := Dial(&websocket.Dialer{}, srv.URL, nil, SetHandler(h))
 	require.NoError(t, err, "Dial")
 
 	_, err = cli.Call("a", "b", 0)
@@ -65,7 +64,7 @@ func TestClientReadLimit(t *testing.T) {
 	defer srv.Close()
 
 	h := HandlerFunc(func(ctx context.Context, m message.Msg) {})
-	cli, err := Dial(&websocket.Dialer{}, srv.URL, nil, SetHandler(h), SetReadLimit(90), SetLogFunc((&jugglertest.DebugLog{T: t}).Printf))
+	cli, err := Dial(&websocket.Dialer{}, srv.URL, nil, SetHandler(h), SetReadLimit(90))
 	require.NoError(t, err, "Dial")
 
 	// Make a call request, should succeed, but trigger an error
@@ -110,9 +109,7 @@ func TestClient(t *testing.T) {
 		mu.Unlock()
 	})
 
-	cli, err := Dial(&websocket.Dialer{}, srv.URL, nil, SetHandler(h),
-		SetCallTimeout(time.Millisecond),
-		SetLogFunc((&jugglertest.DebugLog{T: t}).Printf))
+	cli, err := Dial(&websocket.Dialer{}, srv.URL, nil, SetHandler(h), SetCallTimeout(time.Millisecond))
 	require.NoError(t, err, "Dial")
 
 	// call
