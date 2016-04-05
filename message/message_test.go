@@ -3,6 +3,7 @@ package message
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"reflect"
 	"testing"
@@ -78,6 +79,34 @@ func TestNewNackFromAck(t *testing.T) {
 	assert.Equal(t, nack.Payload.ForType, ack.Payload.ForType, "ForType")
 	assert.Equal(t, nack.Payload.URI, ack.Payload.URI, "URI")
 	assert.Equal(t, nack.Payload.Channel, ack.Payload.Channel, "Channel")
+}
+
+func TestRegister(t *testing.T) {
+	nm := uuid.NewRandom().String() // avoid failures when running tests multiple times
+
+	typ := Register(nm)
+	assert.False(t, typ.IsRead(), "IsRead is false")
+	assert.False(t, typ.IsWrite(), "IsWrite is false")
+	assert.False(t, typ.IsStd(), "IsStd is false")
+	assert.Equal(t, nm, typ.String(), "String")
+
+	assert.Panics(t, func() {
+		Register(nm)
+	}, "Registering twice panics")
+}
+
+func TestUnknownType(t *testing.T) {
+	unkTyp := Type(nextCustomMsg)
+	assert.Equal(t, fmt.Sprintf("<unknown: %d>", unkTyp), unkTyp.String())
+}
+
+func TestUnmarshalIfUnknown(t *testing.T) {
+	meta := NewMeta(Type(-1)) // invalid message
+	b, err := json.Marshal(partialMsg{Meta: meta})
+	require.NoError(t, err, "Marshal failed")
+	_, err = unmarshalIf(bytes.NewReader(b), Type(-1))
+	assert.Error(t, err)
+	t.Log(err)
 }
 
 func TestUnmarshalRequest(t *testing.T) {
