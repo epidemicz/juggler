@@ -1,7 +1,6 @@
 # juggler
 
 TODO :
-* document root juggler package (godoc)
 * better test coverage
 * run load tests with a redis and juggler-server cluster (behind Caddy load balancer)
 * README/License and blog article

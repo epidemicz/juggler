@@ -17,7 +17,8 @@
 // "RPC_URI_%d" where %d is e.g. a number from 1 to 100.
 // Clients that need to call this function can use a random
 // over that range to spread the load over different cluster
-// nodes.
+// nodes, or a server handler can alter the URI to achieve
+// that result without impacting clients.
 //
 package redisbroker
 
