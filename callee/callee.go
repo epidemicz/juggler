@@ -61,10 +61,12 @@ func (c *Callee) InvokeAndStoreResult(cp *message.CallPayload, fn Thunk) error {
 // The method implements a single-producer, single-consumer helper,
 // where a single redis connection is used to listen for call requests
 // on the URIs, and for each request, a single goroutine executes
-// the calls and stores the results. More advanced concurrency
-// patterns can be implemented using Callee.Broker.Calls directly,
-// and starting multiple consumer goroutines reading from the same calls
-// channel and calling InvokeAndStoreResult to process each call request.
+// the calls and stores the results. If there's an error when storing
+// the result, that error is ignored and the next request is processed.
+// More advanced concurrency patterns and error handling can be
+// implemented using Callee.Broker.Calls directly, and starting multiple
+// consumer goroutines reading from the same calls channel and calling
+// InvokeAndStoreResult to process each call request.
 //
 // The function blocks until the call request loop exits. It returns
 // the error that caused the loop to stop, or the error to initiate
@@ -85,12 +87,8 @@ func (c *Callee) Listen(m map[string]Thunk) error {
 	defer conn.Close()
 
 	for cp := range conn.Calls() {
-		if err := c.InvokeAndStoreResult(cp, m[cp.URI]); err != nil {
-			if err == ErrCallExpired {
-				continue
-			}
-			continue
-		}
+		// errors are ignored, use InvokeAndStoreResult directly to handle them.
+		c.InvokeAndStoreResult(cp, m[cp.URI])
 	}
 	return conn.CallsErr()
 }
