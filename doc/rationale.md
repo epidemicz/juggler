@@ -4,16 +4,16 @@ This file documents the rationale for some design decisions. Some of those decis
 
 ## No AUTH mechanism / message
 
-There are many different authentication mechanisms, each with its own advantages and trade-offs, and there are many usage contexts, each with their own security requirements. Many authentication mechanisms can be built in userland using the existing CALL/RES messages and a set of conventions. For example, similar to the cookie with session ID:
+There are many different authentication mechanisms, each with its own advantages and trade-offs, and there are many usage contexts, each with their own security requirements. Many authentication mechanisms can be built in "userland" using the existing CALL/RES messages and a set of conventions. For example, similar to the cookie with session ID:
 
 * CALL com.example.auth {"username": "x", "password": "y"}
 * RES {"authenticated": true, "roles": ["admin"], "token": "xyz"}
 
 Then for URIs that require authentication, the middleware `Handler` can check for a valid token (exists and is not expired), and either proceed with the authenticated call or return:
 
-* NACK {"code": 403, "message": "user is not authenticated"}
+* NACK {"code": 401, "message": "user is not authenticated"}
 
-A downside is that it makes it harder to connect different juggler clients and servers, since authentication is implementation/application-specific. This is ok given the goal of juggler, which is to build web applications, not for interoperability between heterogeneous systems.
+A downside is that it makes it harder to connect different juggler clients and servers, since authentication is implementation/application-specific. This is ok given the goal of juggler, which is to build web/mobile applications, not for interoperability between heterogeneous systems.
 
 ## No CLOSE mechanism / message
 
@@ -24,7 +24,7 @@ That being said, although clients can send `close` websocket frames, there is no
 * The client sends CALL com.example.close
 * A middleware handler intercepts the CALL and emits the `close` websocket frame, which initiates closing the connection.
 
-A downside is that it makes it harder to cleanly disconnect from different juggler clients and servers, since the close mechanism is implementation/application-specific. This is ok given the goal of juggler, which is to build web applications, not for interoperability between heterogeneous systems.
+A downside is that it makes it harder to cleanly disconnect from different juggler clients and servers, since the close mechanism is implementation/application-specific. This is ok given the goal of juggler, which is to build web/mobile applications, not for interoperability between heterogeneous systems.
 
 ## No whitelisting/dynamic discovery of URIs/channels
 
