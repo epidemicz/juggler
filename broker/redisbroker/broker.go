@@ -1,7 +1,7 @@
-// Package redisbroker implements a juggler broker using Redis
+// Package redisbroker implements a juggler broker using redis
 // as backend. RPC calls and results are stored in redis lists
 // and queried via the BRPOP command, while pub-sub events
-// are handled using Redis' built-in pub-sub support.
+// are handled using redis' built-in pub-sub support.
 //
 // Call timeouts are handled by an expiring key associated
 // with each call request, and in a similar way for results.
@@ -57,7 +57,7 @@ type Pool interface {
 }
 
 // Broker is a broker that provides the methods to
-// interact with Redis using the juggler protocol.
+// interact with redis using the juggler protocol.
 type Broker struct {
 	// prevent unkeyed literals
 	_ struct{}

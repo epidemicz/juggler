@@ -1,6 +1,6 @@
 // Package broker defines the generic interfaces that a broker must
 // implement in order to act as a juggler broker. The redisbroker
-// package implements those interfaces against a Redis backend.
+// package implements those interfaces against a redis backend.
 package broker
 
 import (
@@ -14,7 +14,7 @@ import (
 // request to expire. If no result is available before this delay,
 // no result will ever be sent. Callers can set a message-specific
 // timeout, this value is only used if no timeout was specified
-// on the message.
+// on the message. It should not be set to less than 1ms.
 var DefaultCallTimeout = time.Minute
 
 // CallerBroker defines the methods for a broker in the caller role.
