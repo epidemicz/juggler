@@ -100,7 +100,7 @@
 // To do so, the Conn offers the Send method, for example:
 //
 //     func CheckAccessHandler(ctx context.Context, c *juggler.Conn, m message.Msg) {
-//       // assume we detected that the caller doesn't have access
+//       // assume we detected that the caller doesn't have access, in the ok variable
 //       if !ok {
 //         nack := message.NewNack(m, 403, errors.New("caller doesn't have access"))
 //         c.Send(nack)

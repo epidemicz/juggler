@@ -1,5 +1,5 @@
 // Package redisbroker implements a juggler broker using Redis
-// as backend. RPC calls and results are stored in Redis lists
+// as backend. RPC calls and results are stored in redis lists
 // and queried via the BRPOP command, while pub-sub events
 // are handled using Redis' built-in pub-sub support.
 //
@@ -81,12 +81,13 @@ type Broker struct {
 
 	// CallCap is the capacity of the CALL queue per URI. If it is
 	// exceeded for a given URI, subsequent Broker.Call calls for that
-	// URI will fail with an error.
+	// URI will fail with an error. The default of 0 means no limit.
 	CallCap int
 
 	// ResultCap is the capacity of the RES queue per connection UUID.
 	// If it is exceeded for a given connection, Broker.Result calls
-	// for that connection will fail with an error.
+	// for that connection will fail with an error. The default of 0
+	// means no limit.
 	ResultCap int
 
 	// Vars can be set to an *expvar.Map to collect metrics about the
