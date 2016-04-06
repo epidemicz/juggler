@@ -4,10 +4,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/PuerkitoBio/juggler/client"
 	"github.com/PuerkitoBio/juggler/internal/wstest"
 	"github.com/PuerkitoBio/juggler/internal/wswriter"
 	"github.com/PuerkitoBio/juggler/message"
@@ -29,6 +34,47 @@ type fakeResultsConn struct{}
 func (f fakeResultsConn) Results() <-chan *message.ResPayload { return nil }
 func (f fakeResultsConn) ResultsErr() error                   { return nil }
 func (f fakeResultsConn) Close() error                        { return nil }
+
+func TestDelegatedMethods(t *testing.T) {
+	done := make(chan bool, 1)
+	srv := wstest.StartRecordingServer(t, done, ioutil.Discard)
+	defer srv.Close()
+
+	wsc := wstest.Dial(t, srv.URL)
+	defer wsc.Close()
+
+	jc := newConn(wsc, &Server{})
+	defer jc.Close(nil)
+
+	addr1, addr2 := wsc.LocalAddr(), jc.LocalAddr()
+	assert.Equal(t, addr1, addr2, "LocalAddr")
+	addr1, addr2 = wsc.RemoteAddr(), jc.RemoteAddr()
+	assert.Equal(t, addr1, addr2, "RemoteAddr")
+	assert.Equal(t, wsc, jc.UnderlyingConn(), "UnderlyingConn")
+}
+
+func TestSendBinaryMessage(t *testing.T) {
+	server := &Server{}
+	upg := &websocket.Upgrader{Subprotocols: Subprotocols}
+	srv := httptest.NewServer(Upgrade(upg, server))
+	srv.URL = strings.Replace(srv.URL, "http:", "ws:", 1)
+	defer srv.Close()
+
+	cli, err := client.Dial(&websocket.Dialer{Subprotocols: Subprotocols}, srv.URL, http.Header{"Juggler-Allowed-Messages": {"pub"}})
+	require.NoError(t, err, "Dial")
+
+	wsc := cli.UnderlyingConn()
+	w, err := wsc.NextWriter(websocket.BinaryMessage)
+	require.NoError(t, err, "NextWriter")
+	fmt.Fprint(w, "some bytes in binary form")
+	require.NoError(t, w.Close(), "Close")
+
+	select {
+	case <-cli.CloseNotify():
+	case <-time.After(100 * time.Millisecond):
+		t.Errorf("client connection not closed as expected")
+	}
+}
 
 func TestExclusiveWriter(t *testing.T) {
 	var buf bytes.Buffer

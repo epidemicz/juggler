@@ -1,6 +1,7 @@
 package juggler_test
 
 import (
+	"expvar"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -310,6 +311,11 @@ func newClientMsg(t *testing.T, conf *IntgConfig, rnd *rand.Rand) (m message.Msg
 func runIntegrationTest(t *testing.T, conf *IntgConfig) {
 	dbgl := &jugglertest.DebugLog{T: t}
 
+	// create the vars map, but do not publish it, so it doesn't
+	// panic if the test is run multiple times in the same execution
+	// (e.g. with -cpu=1,2,4).
+	vars := new(expvar.Map).Init()
+
 	// start/create:
 	// 1. redis-server
 	// 2. redis pool and broker
@@ -334,6 +340,8 @@ func runIntegrationTest(t *testing.T, conf *IntgConfig) {
 		BlockingTimeout: conf.BrokerBlockingTimeout,
 		CallCap:         conf.BrokerCallCap,
 		ResultCap:       conf.BrokerResultCap,
+
+		Vars: vars,
 	}
 
 	// 3. create the juggler server
@@ -350,6 +358,8 @@ func runIntegrationTest(t *testing.T, conf *IntgConfig) {
 		WriteLimit:              conf.ServerWriteLimit,
 		WriteTimeout:            conf.ServerWriteTimeout,
 		AcquireWriteLockTimeout: conf.ServerAcquireWriteLockTimeout,
+
+		Vars: vars,
 	}
 	upg := &websocket.Upgrader{Subprotocols: juggler.Subprotocols}
 	httpsrv := httptest.NewServer(juggler.Upgrade(upg, srv))
