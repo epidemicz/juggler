@@ -1,5 +1,5 @@
 // Package juggler implements a websocket-based, redis-backed RPC and
-// pub-sub server. RPC (remote procedure calls) requests are routed
+// pub-sub server. RPC (remote procedure call) requests are routed
 // to a URI, and the response is asynchronous and is only sent to
 // the calling client. Pub-sub events are also asynchronous but
 // are routed to every client subscribed to the channel on which the
@@ -8,7 +8,8 @@
 //
 // All messages sent by the client receive an acknowledge message
 // (ACK) when processed successfully or a negative acknowledge (NACK)
-// if the request was rejected.
+// if the request was rejected. See the juggler/message package documentation
+// for all details regarding the supported messages.
 //
 // Server
 //
@@ -24,12 +25,12 @@
 // That is, only the pub-sub and caller brokers must be set for the server
 // to start serving connections. The broker is typically a redisbroker.Broker,
 // although it can be any value that implements the broker.PubSubBroker and
-// broker.CallerBroker interfaces.
+// broker.CallerBroker interfaces, respectively.
 //
 // Additional fields allow for more advanced configuration, such as
-// read and write timeouts, and custom message handling, via the Handler.
-// Metrics can be collected by setting the Vars field to an *expvar.Map.
-// See the Server type documentation for all details.
+// read and write timeouts and limits, and custom message handling,
+// via the Handler. Metrics can be collected by setting the Vars field
+// to an *expvar.Map. See the Server type documentation for all details.
 //
 // The ServeConn method serves a connection using a configured Server.
 // The Upgrade function creates an http.Handler that upgrades the
