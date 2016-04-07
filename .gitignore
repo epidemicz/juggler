@@ -6,6 +6,8 @@ juggler-server
 juggler-client
 juggler-callee
 juggler-load
+juggler-direct-call
+redis-direct
 *.test
 
 # trace/coverage files

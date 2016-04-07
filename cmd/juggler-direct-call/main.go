@@ -56,7 +56,7 @@ loop:
 			ConnUUID: connUUID,
 			MsgUUID:  uuid.NewRandom(),
 			URI:      "test.delay",
-			Args:     []byte("0"),
+			Args:     []byte(`"0"`),
 		}
 		if err := broker.Call(cp, *timeoutFlag); err != nil {
 			log.Fatalf("Call failed: %v", err)
