@@ -1,0 +1,61 @@
+--- CONFIGURATION (load server 1)
+
+Address:    ws://159.203.38.16:8080/ws
+Protocol:   juggler.0
+URI:        test.delay x 100
+Payload:    0
+
+Connections: 100
+Rate:        -1s
+Timeout:     30s
+Duration:    30s
+
+--- CLIENT STATISTICS
+
+Actual Duration: 30.856098588s
+Calls:           46861
+Acks:            46861
+Nacks:           0
+Results:         46861
+Expired:         0
+
+--- CLIENT LATENCIES
+
+Minimum:         2.198072ms
+Maximum:         530.0903ms
+Average:         64.484186ms
+Median:          53.983353ms
+75th Percentile: 79.645581ms
+90th Percentile: 104.500974ms
+99th Percentile: 295.256155ms
+
+--- CONFIGURATION (load server 2)
+
+Address:    ws://159.203.38.16:8080/ws
+Protocol:   juggler.0
+URI:        test.delay x 100
+Payload:    0
+
+Connections: 100
+Rate:        -1s
+Timeout:     30s
+Duration:    30s
+
+--- CLIENT STATISTICS
+
+Actual Duration: 30.959822991s
+Calls:           41989
+Acks:            41987
+Nacks:           0
+Results:         41989
+Expired:         0
+
+--- CLIENT LATENCIES
+
+Minimum:         5.743184ms
+Maximum:         768.762594ms
+Average:         71.755945ms
+Median:          58.23537ms
+75th Percentile: 85.387404ms
+90th Percentile: 110.69971ms
+99th Percentile: 359.328886ms
