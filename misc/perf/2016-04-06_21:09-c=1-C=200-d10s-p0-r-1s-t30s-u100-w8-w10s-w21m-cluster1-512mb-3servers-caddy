@@ -1,0 +1,30 @@
+--- CONFIGURATION
+
+Address:    ws://159.203.13.94:8080/ws
+Protocol:   juggler.0
+URI:        test.delay x 100
+Payload:    0
+
+Connections: 200
+Rate:        -1s
+Timeout:     30s
+Duration:    10s
+
+--- CLIENT STATISTICS
+
+Actual Duration: 11.559417956s
+Calls:           30734
+Acks:            30734
+Nacks:           0
+Results:         30734
+Expired:         0
+
+--- CLIENT LATENCIES
+
+Minimum:         435.086µs
+Maximum:         476.463779ms
+Average:         69.874903ms
+Median:          58.191371ms
+75th Percentile: 78.588774ms
+90th Percentile: 107.345393ms
+99th Percentile: 309.158631ms
