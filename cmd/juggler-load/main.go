@@ -39,6 +39,7 @@ var (
 	callRateFlag    = flag.Duration("r", 100*time.Millisecond, "Call `rate` per connection. A negative rate makes a call once the previous response is received.")
 	callTimeoutFlag = flag.Duration("t", time.Second, "Call `timeout`.")
 	uriFlag         = flag.String("u", "test.delay", "Call `URI`.")
+	noDebugVarsFlag = flag.Bool("V", false, "No debug vars.")
 	waitFlag        = flag.Duration("w", 5*time.Second, "Wait `duration` for connections to stop.")
 )
 
@@ -333,7 +334,11 @@ func main() {
 	}
 	parsed.Scheme = "http"
 	parsed.Path = "/debug/vars"
-	before := getExpVars(parsed)
+
+	before, after := &expVars{}, &expVars{}
+	if !*noDebugVarsFlag {
+		before = getExpVars(parsed)
+	}
 
 	clientStarted := make(chan struct{})
 	resLatency := make(chan []time.Duration)
@@ -376,7 +381,9 @@ func main() {
 	stats.ActualDuration = end.Sub(start)
 	log.Printf("stopped.")
 
-	after := getExpVars(parsed)
+	if !*noDebugVarsFlag {
+		after = getExpVars(parsed)
+	}
 
 	ts := templateStats{Run: stats, Before: before, After: after, Latencies: latencies}
 	if err := tpl.Execute(os.Stdout, ts); err != nil {
