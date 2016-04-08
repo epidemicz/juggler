@@ -8,7 +8,10 @@ Juggler implements highly decoupled, asynchronous RPC and pub-sub over websocket
 * [Goals](#goals)
 * [Installation](#installation)
 * [Documentation](#documentation)
-* [Getting Started](#getting-started)
+* [Getting started](#getting-started)
+    - [Implement an RPC callee](#implement-an-rpc-callee)
+    - [Implement a juggler server](#implement-a-juggler-server)
+    - [Experiment in docker](#experiment-in-docker)
 * [Performance](#performance)
 * [License](#license)
 
@@ -246,7 +249,7 @@ All tests were run on the smallest 512Mb droplet in the Toronto region. The redi
     </tbody>
 </table>
 
-The numbers per second for the juggler tests represent a full CALL - ACK - RES, meaning the call was processed by the calle and the result was received by the client. The client-measured latencies during those juggler load tests was below 100ms per call for the median, and below 400ms for the 99th percentile. Pub-sub was not stress-tested as it uses the native redis feature and there are some benchmarks already available for this. As always with benchmarks, you should run your own in your own environment and representative use-case. There is a script in `misc/perf/run-do-test.sh` that can help you with this, make sure you understand the script before running it using your digital ocean account. Many raw test results are available in this `misc/perf` directory.
+The numbers per second for the juggler tests represent a full CALL - ACK - RES, meaning the call was processed by the callee and the result was received by the client. The client-measured latencies during those juggler load tests was below 100ms per call for the median, and below 400ms for the 99th percentile. Pub-sub was not stress-tested as it uses the native redis feature and there are some benchmarks already available for this. As always with benchmarks, you should run your own in your own environment and representative use-case. There is a script in `misc/perf/run-do-test.sh` that can help you with this, make sure you understand the script before running it using your digital ocean account. Many raw test results are available in this `misc/perf` directory.
 
 ### License
 
