@@ -46,16 +46,16 @@ In a nutshell, the architecture looks like this:
 
 ### Goals
 
-The project was initially inspired by [the Web Application Messaging Protocol (WAMP)][wamp]. This is an application protocal that aims to work on a variety of transports (including websockets) with a focus on supporting embedded devices / the "internet of things", and any peer can be a caller and a callee. The specification is still in progress and as such, the protocol is a bit of a moving target, but it is a very interesting and ambitious project that you should check out if you're interested in something like this.
+The project was initially inspired by [the Web Application Messaging Protocol (WAMP)][wamp]. This is an application protocol that aims to work on a variety of transports (including websockets) with a focus on supporting embedded devices / the "internet of things", and any peer can be a caller and a callee. The specification is still in progress and as such, the protocol is a bit of a moving target, but it is a very interesting and ambitious project that you should check out if you're interested in something like this.
 
 While trying to implement a WAMP router, I started thinking about a simpler, less ambitious implementation that would support what I feel are the most typically useful features using a battle-tested, scalable backend as broker - redis - instead of having a new piece of software manage the state (the `router` in the WAMP specification). Out-of-the-box, redis supports horizontal scaling and failover via the redis cluster, and it natively supports pub-sub. It also offers all the required primitives to handle RPC.
 
 The goals of the juggler protocol and implementation are, in no specific order:
 
-* Simplicity - the "protocol" is really just a pre-defined set of messages exchanged over websockets
+* Simplicity - the "protocol" is really just a pre-defined set of JSON-encoded messages exchanged over websockets
 * Minimalism - it offers basic RPC and pub-sub primitives, leaving more specific behaviour to the applications
 * Scalability - via redis cluster and a websocket load balancer in front of multiple juggler servers, there is a clear scale-out path for juggler-based applications
-* Focused on web application development - web browsers and mobile applications are the target clients, embedded devices and such are not an explicit concern
+* Focused on web application development - web browsers and mobile applications are the target clients, embedded devices are not an explicit concern
 
 ### Install
 
@@ -96,9 +96,9 @@ $ docker-compose run client
 
 This will start the interactive client to make calls to the juggler server. This test environment registers 3 RPC URIs:
 
-* test.echo : returns whatever string was passed as parameter.
-* test.reverse : reverses the string passed as parameter.
-* test.delay : sleeps for N millisecond, N being the number passed as parameter.
+* `test.echo` : returns whatever string was passed as parameter.
+* `test.reverse` : reverses the string passed as parameter.
+* `test.delay` : sleeps for N millisecond, N being the number passed as parameter.
 
 Enter `connect` to start a new connection (you can start many connections in the same interactive session). Enter `help` to get the list of available commands and expected arguments. Type `exit` to terminate the session.
 
@@ -110,10 +110,10 @@ The redis tests are executed locally. The juggler tests go through the whole lay
 
 <table>
     <thead>
-        <th>
-            <td>Scenario</td>
-            <td>Throughput</td>
-        </th>
+        <tr>
+            <th>Scenario</th>
+            <th>Throughput</th>
+        </tr>
     </thead>
     <tbody>
         <tr>
