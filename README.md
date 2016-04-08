@@ -80,6 +80,8 @@ The goals of the juggler protocol and implementation are, in no specific order:
 * Scalability - via redis cluster and a websocket load balancer in front of multiple juggler servers, and independently managed instances of callees, there is scale-out support for juggler-based applications.
 * Focused on web/mobile application development - web browsers and mobile applications are the target clients, embedded devices are not an explicit concern.
 
+Additional information about the design rationale can be found in doc/rationale.md.
+
 ### Installation
 
 Make sure you have the [Go programming language properly installed][go], then run in a terminal:
