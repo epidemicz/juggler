@@ -37,20 +37,13 @@ In a nutshell, the architecture looks like this:
            ^
            |
            v
-     +-----------+
-     |           |
-     | (c) Redis |
-     |           |
-     +-----------+
-           ^
-           |
-           v
-     +------------+
-     |            |-+
-     | (d) Callee | |
-     |            | |
-     +------------+ |
-       +------------+
+     +-----------+                +------------+
+     |           |                |            |-+
+     | (c) Redis | <------------> | (d) Callee | |
+     | (pub-sub) |                |    (RPC)   | |
+     |           |                |            | |
+     +-----------+                +------------+ |
+                                    +------------+
 ```
 
 * (a) Client is a juggler client.
@@ -85,7 +78,7 @@ The goals of the juggler protocol and implementation are, in no specific order:
 * Simplicity - the "protocol" is really just a pre-defined set of JSON-encoded messages exchanged over websockets: "CALL", "SUB", "UNSB" and "PUB" for clients, "ACK, "NACK", "RES" and "EVNT" for servers.
 * Minimalism - it offers basic RPC and pub-sub primitives, leaving more specific behaviour to the applications.
 * Scalability - via redis cluster and a websocket load balancer in front of multiple juggler servers, and independently managed instances of callees, there is scale-out support for juggler-based applications.
-* Focused on web application development - web browsers and mobile applications are the target clients, embedded devices are not an explicit concern.
+* Focused on web/mobile application development - web browsers and mobile applications are the target clients, embedded devices are not an explicit concern.
 
 ### Installation
 
