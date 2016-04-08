@@ -2,7 +2,7 @@
 
 Juggler implements highly decoupled, asynchronous RPC and pub-sub over websocket connections using redis as broker. It refers both to a websocket subprotocol and the implementation of a juggler server. The repository also contains implementations of the callee, broker and client roles.
 
-**This is still experimental. Use at your own risk. Not battle-tested in production environment. API may change.**
+**This is still experimental. Use at your own risk. Not battle-tested in production environment. API may change. Javascript (and other languages) client not implemented yet.**
 
 In a nutshell, the architecture looks like this:
 
@@ -13,7 +13,7 @@ In a nutshell, the architecture looks like this:
 |           |                 |            |               |            | |
 +-----------+                 +------------+               +------------+ |
       ^                                                      +------------+
-      |                        
+      |
       v
 +------------+
 |            |-+
@@ -102,6 +102,10 @@ This will start the interactive client to make calls to the juggler server. This
 
 Enter `connect` to start a new connection (you can start many connections in the same interactive session). Enter `help` to get the list of available commands and expected arguments. Type `exit` to terminate the session.
 
+#### Implement an RPC callee
+
+#### Implement a juggler server
+
 ### Performance
 
 Juggler has been load-tested in various configurations on digital ocean's droplets. Before talking about "how fast" it is, let's first define "fast" in relative terms. Tests have been executed on the DO droplet for redis LPUSH and BRPOP to figure out the maximum throughput, then with tests closer to what juggler does (juggler doesn't just push a value on the list, it marshals a struct to JSON, and runs a lua script in redis to push the value on the list and set an expiration key atomically, so each RPC call has a TTL after which the result is discarded). This helps get a good idea of what the ideal throughput can be, and then compare that to the actual juggler throughput. All tests were run on the smallest 512Mb droplet in the Toronto region.
@@ -139,7 +143,7 @@ The redis tests are executed locally. The juggler tests go through the whole lay
     </tbody>
 </table>
 
-The client-measured latencies during those juggler load tests was below 100ms per call for the median, and below 400ms for the 99th percentile. Pub-sub was not stress-tested as it uses the native redis feature and there are some benchmarks already available for this. As always with benchmarks, you should run your own in your own environment and use-case. There is a script in `misc/perf/run-do-test.sh` that can help you with this, make sure you understand the script before running it using your digital ocean account.
+The client-measured latencies during those juggler load tests was below 100ms per call for the median, and below 400ms for the 99th percentile. Pub-sub was not stress-tested as it uses the native redis feature and there are some benchmarks already available for this. As always with benchmarks, you should run your own in your own environment and use-case. There is a script in `misc/perf/run-do-test.sh` that can help you with this, make sure you understand the script before running it using your digital ocean account. Many raw test results are available in this `misc/perf` directory.
 
 ### License
 
