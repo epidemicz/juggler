@@ -8,7 +8,7 @@
 //
 // All messages sent by the client receive an acknowledge message
 // (ACK) when processed successfully or a negative acknowledge (NACK)
-// if the request was rejected. See the juggler/message package documentation
+// if the request was rejected. See the message package documentation
 // for all details regarding the supported messages.
 //
 // Server
