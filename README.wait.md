@@ -108,6 +108,72 @@ The [godoc package documentation][godoc] is the canonical source of documentatio
 
 #### Implement an RPC callee
 
+```
+// from package callee, file example_test.go
+func Example() {
+	// create a redis pool
+	pool := &redis.Pool{
+		MaxIdle:     10,
+		MaxActive:   100,
+		IdleTimeout: 30 * time.Second,
+		Dial: func() (redis.Conn, error) {
+			return redis.Dial("tcp", redisAddr)
+		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			return err
+		},
+	}
+
+	// create a redis broker
+	broker := &redisbroker.Broker{
+		Pool:      pool,
+		Dial:      pool.Dial,
+		ResultCap: 1000,
+	}
+
+	// create the callee
+	c := &callee.Callee{Broker: broker}
+
+	// get the Calls connection, that will stream the call requests to
+	// the specified URIs (here, only one) on a channel.
+	cc, err := broker.NewCallsConn(calleeURI)
+	if err != nil {
+		log.Fatalf("NewCallsConn failed: %v", err)
+	}
+	defer cc.Close()
+
+	// start n workers
+	wg := sync.WaitGroup{}
+	wg.Add(nWorkers)
+	for i := 0; i < nWorkers; i++ {
+		go func() {
+			defer wg.Done()
+
+			// cc.Calls returns the same channel on each call, so all
+			// workers actually process requests from the same channel.
+			ch := cc.Calls()
+			for cp := range ch {
+				if err := c.InvokeAndStoreResult(cp, echoThunk); err != nil {
+					if err != callee.ErrCallExpired {
+						log.Printf("InvokeAndStoreResult failed: %v", err)
+						continue
+					}
+					log.Printf("expired request %v %s", cp.MsgUUID, cp.URI)
+					continue
+				}
+				log.Printf("sent result %v %s", cp.MsgUUID, cp.URI)
+			}
+		}()
+	}
+	wg.Wait()
+
+	// runs forever, in a main command we could listen to a signal
+	// using signal.Notify and close the Calls connection when e.g. SIGINT
+	// is received, and then wait on the wait group for proper termination.
+}
+```
+
 #### Implement a juggler server
 
 #### Experiment in docker
@@ -180,7 +246,7 @@ All tests were run on the smallest 512Mb droplet in the Toronto region. The redi
     </tbody>
 </table>
 
-The client-measured latencies during those juggler load tests was below 100ms per call for the median, and below 400ms for the 99th percentile. Pub-sub was not stress-tested as it uses the native redis feature and there are some benchmarks already available for this. As always with benchmarks, you should run your own in your own environment and representative use-case. There is a script in `misc/perf/run-do-test.sh` that can help you with this, make sure you understand the script before running it using your digital ocean account. Many raw test results are available in this `misc/perf` directory.
+The numbers per second for the juggler tests represent a full CALL - ACK - RES, meaning the call was processed by the calle and the result was received by the client. The client-measured latencies during those juggler load tests was below 100ms per call for the median, and below 400ms for the 99th percentile. Pub-sub was not stress-tested as it uses the native redis feature and there are some benchmarks already available for this. As always with benchmarks, you should run your own in your own environment and representative use-case. There is a script in `misc/perf/run-do-test.sh` that can help you with this, make sure you understand the script before running it using your digital ocean account. Many raw test results are available in this `misc/perf` directory.
 
 ### License
 
