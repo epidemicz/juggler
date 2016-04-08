@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	redisAddr = ":6060"
+	redisAddr = ":6379"
 	nWorkers  = 10
 	calleeURI = "example.echo"
 )
