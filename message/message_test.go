@@ -14,6 +14,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestCallNoArgument(t *testing.T) {
+	call, err := NewCall("uri", nil, time.Second)
+	assert.NoError(t, err, "NewCall")
+	assert.Equal(t, json.RawMessage("null"), call.Payload.Args, "Args is null")
+
+	b, err := json.Marshal(call)
+	require.NoError(t, err, "Marshal")
+	got, err := Unmarshal(bytes.NewReader(b))
+	assert.NoError(t, err, "Unmarshal")
+	assert.Equal(t, call, got, "Identical after Unmarshal")
+}
+
 func TestMarshalUnmarshal(t *testing.T) {
 	t.Parallel()
 
