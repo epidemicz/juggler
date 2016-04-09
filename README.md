@@ -108,6 +108,24 @@ The [godoc package documentation][godoc] is the canonical source of documentatio
 
 ```
 // from package callee, file example_test.go
+import (
+	"encoding/json"
+	"log"
+	"sync"
+	"time"
+
+	"github.com/PuerkitoBio/juggler/broker/redisbroker"
+	"github.com/PuerkitoBio/juggler/callee"
+	"github.com/PuerkitoBio/juggler/message"
+	"github.com/garyburd/redigo/redis"
+)
+
+const (
+	redisAddr = ":6379"
+	nWorkers  = 10
+	calleeURI = "example.echo"
+)
+
 func Example() {
 	// create a redis pool
 	pool := &redis.Pool{
@@ -170,12 +188,39 @@ func Example() {
 	// using signal.Notify and close the Calls connection when e.g. SIGINT
 	// is received, and then wait on the wait group for proper termination.
 }
+
+// the Thunk for the example.echo URI, it simply extracts the arguments
+// and acts as the wrapper/type-checker for the actual echo function.
+func echoThunk(cp *message.CallPayload) (interface{}, error) {
+	var s string
+	if err := json.Unmarshal(cp.Args, &s); err != nil {
+		return nil, err
+	}
+	return echo(s), nil
+}
+
+// simply return the same value that was received.
+func echo(s string) string {
+	return s
+}
 ```
 
 #### Implement a juggler server
 
 ```
 // from package juggler, file example_test.go
+import (
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/PuerkitoBio/juggler"
+	"github.com/PuerkitoBio/juggler/broker/redisbroker"
+	"github.com/garyburd/redigo/redis"
+	"github.com/gorilla/websocket"
+)
+
+// This example shows how to set up a juggler server and serve connections.
 func Example() {
 	const redisAddr = ":6379"
 
