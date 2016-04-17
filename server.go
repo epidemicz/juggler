@@ -206,25 +206,34 @@ func Upgrade(upgrader *websocket.Upgrader, srv *Server) http.Handler {
 			return
 		}
 
-		var msgs []message.Type
-		if allowed := strings.TrimSpace(r.Header.Get("Juggler-Allowed-Messages")); allowed != "" && allowed != "*" {
-			types := strings.Split(allowed, ",")
-			for _, typ := range types {
-				typ := strings.TrimSpace(strings.ToLower(typ))
-				switch typ {
-				case "call":
-					msgs = append(msgs, message.CallMsg)
-				case "sub":
-					msgs = append(msgs, message.SubMsg)
-				case "unsb":
-					msgs = append(msgs, message.UnsbMsg)
-				case "pub":
-					msgs = append(msgs, message.PubMsg)
-				}
-			}
-		}
-
+		msgs := AllowedMessagesFromHeader(r.Header)
 		// this call blocks until the juggler connection is closed
 		srv.ServeConn(wsConn, msgs...)
 	})
+}
+
+// AllowedMessagesFromHeader returns the slice of allowed message types
+// as specified in the Juggler-Allowed-Messages header stored in h. If
+// the header is not present, is empty or is "*", an empty slice is returned,
+// meaning that all messages are allowed. The returned slice can be
+// passed as-is to ServeConn.
+func AllowedMessagesFromHeader(h http.Header) []message.Type {
+	var msgs []message.Type
+	if allowed := strings.TrimSpace(h.Get("Juggler-Allowed-Messages")); allowed != "" && allowed != "*" {
+		types := strings.Split(allowed, ",")
+		for _, typ := range types {
+			typ := strings.TrimSpace(strings.ToLower(typ))
+			switch typ {
+			case "call":
+				msgs = append(msgs, message.CallMsg)
+			case "sub":
+				msgs = append(msgs, message.SubMsg)
+			case "unsb":
+				msgs = append(msgs, message.UnsbMsg)
+			case "pub":
+				msgs = append(msgs, message.PubMsg)
+			}
+		}
+	}
+	return msgs
 }
