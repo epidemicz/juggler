@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
@@ -118,8 +119,8 @@ func (l connMsgLogger) Handle(ctx context.Context, m message.Msg) {
 		s = fmt.Sprintf("for %s %v", m.Payload.ForType, m.Payload.For)
 	case *message.Res:
 		n := len(m.Payload.Args)
-		if n > 40 {
-			n = 40
+		if n > 100 {
+			n = 100
 		}
 		val := string(m.Payload.Args[:n])
 		s = fmt.Sprintf("for %s %v (%s)", message.CallMsg, m.Payload.For, val)
@@ -197,7 +198,8 @@ var sendCmd = &cmd{
 var callCmd = &cmd{
 	Usage:   "usage: call CONN_ID URI [TIMEOUT_SEC [ARGS]]",
 	MinArgs: 2,
-	Help:    "send a CALL message to the connection identified by CONN_ID\n\tto URI with optional ARGS that will be marshaled as JSON string",
+	Help: "send a CALL message to the connection identified by CONN_ID\n\tto URI with optional ARGS that will be marshaled as JSON string.\n\t" +
+		"If ARGS is wrapped in backticks, it is sent as raw JSON.",
 
 	Run: func(cmd *cmd, args ...string) {
 		if c, ix := getConn(args[0]); c != nil {
@@ -212,11 +214,18 @@ var callCmd = &cmd{
 			}
 
 			var v string
+			var pld interface{}
 			if len(args) > 3 {
 				v = strings.Join(args[3:], " ")
+				pld = v
+			}
+			if len(v) > 2 && v[0] == '`' && v[len(v)-1] == '`' {
+				// requires a pointer to raw message
+				rm := json.RawMessage(v[1 : len(v)-1])
+				pld = &rm
 			}
 
-			uuid, err := c.Call(args[1], v, to)
+			uuid, err := c.Call(args[1], pld, to)
 			if err != nil {
 				printErr("[%d] Call failed: %v", ix+1, err)
 				return
