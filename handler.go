@@ -8,8 +8,8 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/PuerkitoBio/juggler/internal/wswriter"
-	"github.com/PuerkitoBio/juggler/message"
+	"github.com/mna/juggler/internal/wswriter"
+	"github.com/mna/juggler/message"
 )
 
 // SlowProcessMsgThreshold defines the threshold at which calls to

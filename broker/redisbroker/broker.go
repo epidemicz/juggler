@@ -29,9 +29,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/PuerkitoBio/juggler/broker"
-	"github.com/PuerkitoBio/juggler/message"
-	"github.com/PuerkitoBio/redisc"
+	"github.com/mna/juggler/broker"
+	"github.com/mna/juggler/message"
+	"github.com/mna/redisc"
 	"github.com/garyburd/redigo/redis"
 	"github.com/pborman/uuid"
 )

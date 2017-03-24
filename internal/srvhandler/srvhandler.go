@@ -6,8 +6,8 @@ import (
 	"expvar"
 	"fmt"
 
-	"github.com/PuerkitoBio/juggler"
-	"github.com/PuerkitoBio/juggler/message"
+	"github.com/mna/juggler"
+	"github.com/mna/juggler/message"
 	"golang.org/x/net/context"
 )
 

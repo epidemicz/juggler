@@ -1,6 +1,6 @@
 FROM        golang:1.6-alpine
 
-ENV         DIR /go/src/github.com/PuerkitoBio/juggler
+ENV         DIR /go/src/github.com/mna/juggler
 
 RUN         set -x \
                 && apk add --no-cache --virtual git

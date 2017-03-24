@@ -12,9 +12,9 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/PuerkitoBio/juggler/internal/wstest"
-	"github.com/PuerkitoBio/juggler/internal/wswriter"
-	"github.com/PuerkitoBio/juggler/message"
+	"github.com/mna/juggler/internal/wstest"
+	"github.com/mna/juggler/internal/wswriter"
+	"github.com/mna/juggler/message"
 	"github.com/gorilla/websocket"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/assert"

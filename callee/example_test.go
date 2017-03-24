@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/PuerkitoBio/juggler/broker/redisbroker"
-	"github.com/PuerkitoBio/juggler/callee"
-	"github.com/PuerkitoBio/juggler/message"
+	"github.com/mna/juggler/broker/redisbroker"
+	"github.com/mna/juggler/callee"
+	"github.com/mna/juggler/message"
 	"github.com/garyburd/redigo/redis"
 )
 

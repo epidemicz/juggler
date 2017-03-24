@@ -10,12 +10,12 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/PuerkitoBio/juggler"
-	"github.com/PuerkitoBio/juggler/broker/redisbroker"
-	"github.com/PuerkitoBio/juggler/client"
-	"github.com/PuerkitoBio/juggler/internal/wstest"
-	"github.com/PuerkitoBio/juggler/message"
-	"github.com/PuerkitoBio/redisc/redistest"
+	"github.com/mna/juggler"
+	"github.com/mna/juggler/broker/redisbroker"
+	"github.com/mna/juggler/client"
+	"github.com/mna/juggler/internal/wstest"
+	"github.com/mna/juggler/message"
+	"github.com/mna/redisc/redistest"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

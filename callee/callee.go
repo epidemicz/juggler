@@ -9,8 +9,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/PuerkitoBio/juggler/broker"
-	"github.com/PuerkitoBio/juggler/message"
+	"github.com/mna/juggler/broker"
+	"github.com/mna/juggler/message"
 )
 
 // ErrCallExpired is returned when a call is processed but the

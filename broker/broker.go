@@ -6,7 +6,7 @@ package broker
 import (
 	"time"
 
-	"github.com/PuerkitoBio/juggler/message"
+	"github.com/mna/juggler/message"
 	"github.com/pborman/uuid"
 )
 

@@ -1,4 +1,4 @@
-## juggler - websocket-based, redis-backed RPC and pub-sub [![GoDoc](https://godoc.org/github.com/PuerkitoBio/juggler?status.png)](http://godoc.org/github.com/PuerkitoBio/juggler) [![build status](https://secure.travis-ci.org/PuerkitoBio/juggler.png)](http://travis-ci.org/PuerkitoBio/juggler)
+## juggler - websocket-based, redis-backed RPC and pub-sub [![GoDoc](https://godoc.org/github.com/mna/juggler?status.png)](http://godoc.org/github.com/mna/juggler) [![build status](https://secure.travis-ci.org/mna/juggler.png)](http://travis-ci.org/mna/juggler)
 
 Juggler implements highly decoupled, asynchronous RPC and pub-sub over websocket connections using redis as broker. It refers both to a websocket subprotocol and the implementation of a juggler server. The repository also contains implementations of the callee, broker and client roles.
 
@@ -87,12 +87,12 @@ Additional information about the design rationale can be found in doc/rationale.
 Make sure you have the [Go programming language properly installed][go], then run in a terminal:
 
 ```
-$ go get [-u] [-t] github.com/PuerkitoBio/juggler/...
+$ go get [-u] [-t] github.com/mna/juggler/...
 ```
 
 The juggler packages use the following external dependencies (excluding test dependencies):
 
-* [github.com/PuerkitoBio/redisc][redisc]
+* [github.com/mna/redisc][redisc]
 * [github.com/garyburd/redigo][redigo]
 * [github.com/gorilla/websocket][websocket]
 * [github.com/pborman/uuid][uuid]
@@ -114,9 +114,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/PuerkitoBio/juggler/broker/redisbroker"
-	"github.com/PuerkitoBio/juggler/callee"
-	"github.com/PuerkitoBio/juggler/message"
+	"github.com/mna/juggler/broker/redisbroker"
+	"github.com/mna/juggler/callee"
+	"github.com/mna/juggler/message"
 	"github.com/garyburd/redigo/redis"
 )
 
@@ -214,8 +214,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/PuerkitoBio/juggler"
-	"github.com/PuerkitoBio/juggler/broker/redisbroker"
+	"github.com/mna/juggler"
+	"github.com/mna/juggler/broker/redisbroker"
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/websocket"
 )
@@ -346,11 +346,11 @@ The numbers per second for the juggler tests represent a full CALL - ACK - RES, 
 The [BSD 3-Clause license][bsd], the same as the Go language.
 
 [caddy]: https://caddyserver.com/
-[godoc]: https://godoc.org/github.com/PuerkitoBio/juggler
+[godoc]: https://godoc.org/github.com/mna/juggler
 [bsd]: http://opensource.org/licenses/BSD-3-Clause
 [go]: https://golang.org/doc/install
 [docker]: https://docs.docker.com/machine/install-machine/
-[redisc]: https://github.com/PuerkitoBio/redisc
+[redisc]: https://github.com/mna/redisc
 [redigo]: https://github.com/garyburd/redigo
 [websocket]: https://github.com/gorilla/websocket
 [uuid]: https://github.com/pborman/uuid

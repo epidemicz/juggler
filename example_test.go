@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/PuerkitoBio/juggler"
-	"github.com/PuerkitoBio/juggler/broker/redisbroker"
+	"github.com/mna/juggler"
+	"github.com/mna/juggler/broker/redisbroker"
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/websocket"
 )
