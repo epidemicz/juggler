@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/PuerkitoBio/juggler"
+	"github.com/mna/juggler"
 
 	"gopkg.in/yaml.v2"
 )

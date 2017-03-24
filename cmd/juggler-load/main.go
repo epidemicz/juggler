@@ -22,9 +22,9 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/PuerkitoBio/juggler/client"
-	"github.com/PuerkitoBio/juggler/message"
 	"github.com/gorilla/websocket"
+	"github.com/mna/juggler/client"
+	"github.com/mna/juggler/message"
 )
 
 var (

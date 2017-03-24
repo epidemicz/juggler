@@ -17,12 +17,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/PuerkitoBio/juggler/broker"
-	"github.com/PuerkitoBio/juggler/broker/redisbroker"
-	"github.com/PuerkitoBio/juggler/callee"
-	"github.com/PuerkitoBio/juggler/message"
-	"github.com/PuerkitoBio/redisc"
 	"github.com/garyburd/redigo/redis"
+	"github.com/mna/juggler/broker"
+	"github.com/mna/juggler/broker/redisbroker"
+	"github.com/mna/juggler/callee"
+	"github.com/mna/juggler/message"
+	"github.com/mna/redisc"
 )
 
 var (

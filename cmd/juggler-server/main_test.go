@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/PuerkitoBio/juggler"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/mna/juggler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -16,14 +16,14 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/PuerkitoBio/juggler"
-	"github.com/PuerkitoBio/juggler/broker"
-	"github.com/PuerkitoBio/juggler/broker/redisbroker"
-	"github.com/PuerkitoBio/juggler/internal/srvhandler"
-	"github.com/PuerkitoBio/juggler/message"
-	"github.com/PuerkitoBio/redisc"
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/websocket"
+	"github.com/mna/juggler"
+	"github.com/mna/juggler/broker"
+	"github.com/mna/juggler/broker/redisbroker"
+	"github.com/mna/juggler/internal/srvhandler"
+	"github.com/mna/juggler/message"
+	"github.com/mna/redisc"
 )
 
 var (
