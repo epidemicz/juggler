@@ -64,7 +64,7 @@ func TestResults(t *testing.T) {
 	require.NoError(t, rc.Close(), "close results connection")
 	wg.Wait()
 	if assert.Error(t, rc.ResultsErr(), "ResultsErr returns the error") {
-		assert.Contains(t, rc.ResultsErr().Error(), "use of closed network connection", "ResultsErr is the expected error")
+		assert.Contains(t, rc.ResultsErr().Error(), "use of closed", "ResultsErr is the expected error")
 	}
 	assert.Equal(t, expected, uuids, "got expected UUIDs")
 }

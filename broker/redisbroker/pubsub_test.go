@@ -70,7 +70,7 @@ func TestPubSub(t *testing.T) {
 	require.NoError(t, psc.Close(), "close pubsub connection")
 	wg.Wait()
 	if assert.Error(t, psc.EventsErr(), "EventsErr returns the error") {
-		assert.Contains(t, psc.EventsErr().Error(), "use of closed network connection", "EventsErr is the expected error")
+		assert.Contains(t, psc.EventsErr().Error(), "use of closed", "EventsErr is the expected error")
 	}
 	assert.Equal(t, expected, uuids, "got expected UUIDs")
 }

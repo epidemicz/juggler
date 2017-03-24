@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mna/redisc/redistest"
 	"github.com/garyburd/redigo/redis"
+	"github.com/mna/redisc/redistest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -88,7 +88,7 @@ func TestCloseConnWhileBlocked(t *testing.T) {
 
 		ch <- struct{}{}
 		_, err := conn.Do("BRPOP", "key", 5)
-		assert.Contains(t, err.Error(), "use of closed network connection", "blocked conn returned with error")
+		assert.Contains(t, err.Error(), "use of closed", "blocked conn returned with error")
 		t.Logf("%T %[1]v", err)
 	}()
 
